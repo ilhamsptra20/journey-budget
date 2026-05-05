@@ -6,17 +6,9 @@ import {
   Alert,
   Card,
   CardContent,
-  EmptyState,
+  DataTable,
   PageHeader,
-  Spinner,
   StatCard,
-  Table,
-  TableContainer,
-  TBody,
-  TD,
-  TH,
-  THead,
-  TR,
 } from "@/ui/components";
 import { formatDate } from "@/ui/utils/format";
 
@@ -50,36 +42,39 @@ export function DashboardOverview() {
 
       <div>
         <h2 className="mb-3 text-base font-semibold text-slate-900">Recent Trips</h2>
-        {loading ? (
-          <div className="flex h-24 items-center justify-center">
-            <Spinner className="h-5 w-5" />
-          </div>
-        ) : stats.recentTrips.length === 0 ? (
-          <EmptyState title="Belum ada trip" description="Buat trip baru untuk mulai budgeting." />
-        ) : (
-          <TableContainer>
-            <Table>
-              <THead>
-                <tr>
-                  <TH>Title</TH>
-                  <TH>Location</TH>
-                  <TH>Start Date</TH>
-                  <TH>End Date</TH>
-                </tr>
-              </THead>
-              <TBody>
-                {stats.recentTrips.map((trip) => (
-                  <TR key={trip.id}>
-                    <TD className="font-medium text-slate-900">{trip.title}</TD>
-                    <TD>{trip.location}</TD>
-                    <TD>{formatDate(trip.startDate)}</TD>
-                    <TD>{formatDate(trip.endDate)}</TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          </TableContainer>
-        )}
+        <DataTable
+          data={stats.recentTrips}
+          loading={loading}
+          searchEnabled={false}
+          rowKey={(trip) => trip.id}
+          emptyTitle="Belum ada trip"
+          emptyDescription="Buat trip baru untuk mulai budgeting."
+          columns={[
+            {
+              id: "title",
+              header: "Title",
+              accessor: (trip) => trip.title,
+              cell: (trip) => <span className="font-medium text-slate-900">{trip.title}</span>,
+            },
+            {
+              id: "location",
+              header: "Location",
+              accessor: (trip) => trip.location,
+            },
+            {
+              id: "start",
+              header: "Start Date",
+              accessor: (trip) => trip.startDate,
+              cell: (trip) => formatDate(trip.startDate),
+            },
+            {
+              id: "end",
+              header: "End Date",
+              accessor: (trip) => trip.endDate ?? "",
+              cell: (trip) => formatDate(trip.endDate),
+            },
+          ]}
+        />
       </div>
     </div>
   );

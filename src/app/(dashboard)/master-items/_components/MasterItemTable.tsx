@@ -2,18 +2,7 @@
 
 import { PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 
-import {
-  EmptyState,
-  IconButton,
-  Spinner,
-  Table,
-  TableContainer,
-  TBody,
-  TD,
-  TH,
-  THead,
-  TR,
-} from "@/ui/components";
+import { DataTable, IconButton } from "@/ui/components";
 import { formatCurrencyIDR } from "@/ui/utils/format";
 
 import { AccommodationItem, ConsumptionItem, LogisticItem, MasterTab } from "../_hooks/useMasterItems";
@@ -30,55 +19,63 @@ type MasterItemTableProps = {
 };
 
 export function MasterItemTable({ tab, items, loading, canEdit, onEdit, onDelete }: MasterItemTableProps) {
-  if (loading) {
-    return (
-      <div className="flex h-24 items-center justify-center">
-        <Spinner className="h-5 w-5" />
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return <EmptyState title="Belum ada data" description="Tambahkan item master untuk digunakan di trip." />;
-  }
-
   return (
-    <TableContainer>
-      <Table>
-        <THead>
-          <tr>
-            <TH>Title</TH>
-            {tab !== "logistics" ? <TH>Category</TH> : null}
-            <TH>Unit</TH>
-            <TH>Default Price</TH>
-            <TH className="w-28">Actions</TH>
-          </tr>
-        </THead>
-        <TBody>
-          {items.map((item) => (
-            <TR key={item.id}>
-              <TD className="font-medium text-slate-900">{item.title}</TD>
-              {tab !== "logistics" ? <TD>{"category" in item ? item.category : "-"}</TD> : null}
-              <TD>{item.unit}</TD>
-              <TD>{item.defaultPrice ? formatCurrencyIDR(item.defaultPrice) : "-"}</TD>
-              <TD>
-                {canEdit ? (
-                  <div className="flex items-center gap-2">
-                    <IconButton aria-label="Edit item" onClick={() => onEdit(item)}>
-                      <PencilSquareIcon className="h-4 w-4" />
-                    </IconButton>
-                    <IconButton tone="danger" aria-label="Hapus item" onClick={() => onDelete(item)}>
-                      <TrashIcon className="h-4 w-4" />
-                    </IconButton>
-                  </div>
-                ) : (
-                  <span className="text-xs text-slate-500">Read only</span>
-                )}
-              </TD>
-            </TR>
-          ))}
-        </TBody>
-      </Table>
-    </TableContainer>
+    <DataTable
+      data={items}
+      loading={loading}
+      rowKey={(item) => item.id}
+      searchPlaceholder="Cari master item..."
+      emptyTitle="Belum ada data"
+      emptyDescription="Tambahkan item master untuk digunakan di trip."
+      columns={[
+        {
+          id: "title",
+          header: "Title",
+          accessor: (item) => item.title,
+          cell: (item) => <span className="font-medium text-slate-900">{item.title}</span>,
+        },
+        ...(tab !== "logistics"
+          ? [
+              {
+                id: "category",
+                header: "Category",
+                accessor: (item: ItemLike) => ("category" in item ? item.category : "-"),
+              },
+            ]
+          : []),
+        {
+          id: "unit",
+          header: "Unit",
+          accessor: (item) => item.unit,
+        },
+        {
+          id: "default-price",
+          header: "Default Price",
+          accessor: (item) => item.defaultPrice ?? 0,
+          numeric: true,
+          cell: (item) => (item.defaultPrice ? formatCurrencyIDR(item.defaultPrice) : "-"),
+        },
+        {
+          id: "actions",
+          header: "Actions",
+          searchable: false,
+          align: "right",
+          className: "w-32",
+          cell: (item) =>
+            canEdit ? (
+              <div className="flex items-center justify-end gap-2">
+                <IconButton aria-label="Edit item" onClick={() => onEdit(item)}>
+                  <PencilSquareIcon className="h-4 w-4" />
+                </IconButton>
+                <IconButton tone="danger" aria-label="Hapus item" onClick={() => onDelete(item)}>
+                  <TrashIcon className="h-4 w-4" />
+                </IconButton>
+              </div>
+            ) : (
+              <span className="text-xs text-slate-500">Read only</span>
+            ),
+        },
+      ]}
+    />
   );
 }

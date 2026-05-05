@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ApiClientError, apiClient } from "@/ui/api/client";
 
+export type ExpenseType = "trip_logistics" | "trip_consumptions" | "trip_accommodations";
+
 export type TripData = {
   id: string;
   title: string;
@@ -90,6 +92,14 @@ export type FundRow = {
   note: string | null;
 };
 
+export type ExpenseParticipantRow = {
+  id: string;
+  expense_type: ExpenseType;
+  expense_id: string;
+  member_id: string;
+  member_name: string;
+};
+
 export type SummaryData = {
   trip: TripData;
   members_count: number;
@@ -150,6 +160,42 @@ export type FundPayload = {
   note?: string | null;
 };
 
+type ExpenseParticipantsMap = Record<string, ExpenseParticipantRow[]>;
+
+function participantMapKey(expenseType: ExpenseType, expenseId: string) {
+  return `${expenseType}:${expenseId}`;
+}
+
+function uniqueMemberIds(memberIds: string[]) {
+  return [...new Set(memberIds.filter(Boolean))];
+}
+
+async function fetchParticipantsByExpense(
+  expenseType: ExpenseType,
+  expenseIds: string[],
+): Promise<ExpenseParticipantsMap> {
+  const participantsMap: ExpenseParticipantsMap = {};
+
+  if (expenseIds.length === 0) {
+    return participantsMap;
+  }
+
+  const rowsByExpense = await Promise.all(
+    expenseIds.map((expenseId) =>
+      apiClient.get<ExpenseParticipantRow[]>("/api/expense-participants", {
+        expenseType,
+        expenseId,
+      }),
+    ),
+  );
+
+  rowsByExpense.forEach((rows, index) => {
+    participantsMap[participantMapKey(expenseType, expenseIds[index])] = rows;
+  });
+
+  return participantsMap;
+}
+
 export function useTripDetail(tripId: string) {
   const [trip, setTrip] = useState<TripData | null>(null);
   const [tripMembers, setTripMembers] = useState<TripMemberRow[]>([]);
@@ -164,6 +210,7 @@ export function useTripDetail(tripId: string) {
   const [tripConsumptions, setTripConsumptions] = useState<TripConsumptionRow[]>([]);
   const [tripAccommodations, setTripAccommodations] = useState<TripAccommodationRow[]>([]);
   const [funds, setFunds] = useState<FundRow[]>([]);
+  const [expenseParticipantsMap, setExpenseParticipantsMap] = useState<ExpenseParticipantsMap>({});
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -199,6 +246,22 @@ export function useTripDetail(tripId: string) {
         apiClient.get<Member[]>("/api/members"),
       ]);
 
+      const [logisticParticipants, consumptionParticipants, accommodationParticipants] =
+        await Promise.all([
+          fetchParticipantsByExpense(
+            "trip_logistics",
+            logisticRows.map((row) => row.id),
+          ),
+          fetchParticipantsByExpense(
+            "trip_consumptions",
+            consumptionRows.map((row) => row.id),
+          ),
+          fetchParticipantsByExpense(
+            "trip_accommodations",
+            accommodationRows.map((row) => row.id),
+          ),
+        ]);
+
       setTrip(tripData);
       setTripMembers(tripMemberRows);
       setSummary(summaryData);
@@ -210,6 +273,11 @@ export function useTripDetail(tripId: string) {
       setTripAccommodations(accommodationRows);
       setFunds(fundRows);
       setAllMembers(memberRows);
+      setExpenseParticipantsMap({
+        ...logisticParticipants,
+        ...consumptionParticipants,
+        ...accommodationParticipants,
+      });
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : "Gagal memuat detail trip";
       setError(message);
@@ -246,6 +314,67 @@ export function useTripDetail(tripId: string) {
     }
   };
 
+  const replaceExpenseParticipants = async (
+    expenseType: ExpenseType,
+    expenseId: string,
+    memberIds: string[],
+  ) => {
+    const existing = await apiClient.get<ExpenseParticipantRow[]>("/api/expense-participants", {
+      expenseType,
+      expenseId,
+    });
+
+    await Promise.all(
+      existing.map((row) => apiClient.del(`/api/expense-participants/${row.id}`)),
+    );
+
+    const normalizedMemberIds = uniqueMemberIds(memberIds);
+
+    if (normalizedMemberIds.length > 0) {
+      await apiClient.post("/api/expense-participants", {
+        expense_type: expenseType,
+        expense_id: expenseId,
+        member_ids: normalizedMemberIds,
+      });
+    }
+  };
+
+  const createExpenseWithParticipants = async (
+    expenseType: ExpenseType,
+    createExpense: () => Promise<{ id: string; scope: "group" | "personal" }>,
+    participantIds: string[],
+  ) => {
+    await invokeAction(async () => {
+      const expense = await createExpense();
+
+      if (expense.scope === "personal" && participantIds.length === 0) {
+        throw new ApiClientError("Participants wajib untuk scope personal", 422, {
+          errors: [{ path: ["participants"], message: "Participants wajib untuk scope personal" }],
+        });
+      }
+
+      await replaceExpenseParticipants(expenseType, expense.id, participantIds);
+    });
+  };
+
+  const updateExpenseWithParticipants = async (
+    expenseType: ExpenseType,
+    updateExpense: () => Promise<{ id: string; scope: "group" | "personal" }>,
+    participantIds: string[],
+  ) => {
+    await invokeAction(async () => {
+      const expense = await updateExpense();
+
+      if (expense.scope === "personal" && participantIds.length === 0) {
+        throw new ApiClientError("Participants wajib untuk scope personal", 422, {
+          errors: [{ path: ["participants"], message: "Participants wajib untuk scope personal" }],
+        });
+      }
+
+      await replaceExpenseParticipants(expenseType, expense.id, participantIds);
+    });
+  };
+
   return {
     trip,
     tripMembers,
@@ -257,11 +386,16 @@ export function useTripDetail(tripId: string) {
     tripConsumptions,
     tripAccommodations,
     funds,
+    expenseParticipantsMap,
     allMembers,
     memberMap,
     loading,
     error,
     refresh: fetchAll,
+    getExpenseParticipantsMemberIds: (expenseType: ExpenseType, expenseId: string) => {
+      const rows = expenseParticipantsMap[participantMapKey(expenseType, expenseId)] ?? [];
+      return rows.map((row) => row.member_id);
+    },
     addTripMember: (memberId: string) =>
       invokeAction(() =>
         apiClient.post(`/api/trips/${tripId}/members`, {
@@ -270,23 +404,109 @@ export function useTripDetail(tripId: string) {
       ),
     removeTripMember: (memberId: string) =>
       invokeAction(() => apiClient.del(`/api/trips/${tripId}/members/${memberId}`)),
-    createTripLogistic: (payload: TripLogisticPayload) =>
-      invokeAction(() => apiClient.post(`/api/trips/${tripId}/expenses/logistics`, payload)),
-    updateTripLogistic: (id: string, payload: Partial<TripLogisticPayload>) =>
-      invokeAction(() => apiClient.patch(`/api/trips/${tripId}/expenses/logistics/${id}`, payload)),
+    createLogisticMasterItem: async (title: string) => {
+      return apiClient.post<LogisticItem, { title: string; unit: string; default_price: number | null }>(
+        "/api/master-items/logistics",
+        {
+          title,
+          unit: "pcs",
+          default_price: null,
+        },
+      );
+    },
+    createConsumptionMasterItem: async (title: string) => {
+      return apiClient.post<ConsumptionItem, {
+        title: string;
+        category: "other";
+        unit: string;
+        default_price: number | null;
+      }>("/api/master-items/consumptions", {
+        title,
+        category: "other",
+        unit: "pcs",
+        default_price: null,
+      });
+    },
+    createAccommodationMasterItem: async (title: string) => {
+      return apiClient.post<AccommodationItem, {
+        title: string;
+        category: "other";
+        unit: string;
+        default_price: number | null;
+      }>("/api/master-items/accommodations", {
+        title,
+        category: "other",
+        unit: "pcs",
+        default_price: null,
+      });
+    },
+    createTripLogistic: (payload: TripLogisticPayload, participantIds: string[]) =>
+      createExpenseWithParticipants(
+        "trip_logistics",
+        () => apiClient.post<TripLogisticRow, TripLogisticPayload>(`/api/trips/${tripId}/expenses/logistics`, payload),
+        participantIds,
+      ),
+    updateTripLogistic: (
+      id: string,
+      payload: Partial<TripLogisticPayload>,
+      participantIds: string[],
+    ) =>
+      updateExpenseWithParticipants(
+        "trip_logistics",
+        () => apiClient.patch<TripLogisticRow, Partial<TripLogisticPayload>>(`/api/trips/${tripId}/expenses/logistics/${id}`, payload),
+        participantIds,
+      ),
     deleteTripLogistic: (id: string) =>
       invokeAction(() => apiClient.del(`/api/trips/${tripId}/expenses/logistics/${id}`)),
-    createTripConsumption: (payload: TripConsumptionPayload) =>
-      invokeAction(() => apiClient.post(`/api/trips/${tripId}/expenses/consumptions`, payload)),
-    updateTripConsumption: (id: string, payload: Partial<TripConsumptionPayload>) =>
-      invokeAction(() => apiClient.patch(`/api/trips/${tripId}/expenses/consumptions/${id}`, payload)),
+    createTripConsumption: (payload: TripConsumptionPayload, participantIds: string[]) =>
+      createExpenseWithParticipants(
+        "trip_consumptions",
+        () =>
+          apiClient.post<TripConsumptionRow, TripConsumptionPayload>(
+            `/api/trips/${tripId}/expenses/consumptions`,
+            payload,
+          ),
+        participantIds,
+      ),
+    updateTripConsumption: (
+      id: string,
+      payload: Partial<TripConsumptionPayload>,
+      participantIds: string[],
+    ) =>
+      updateExpenseWithParticipants(
+        "trip_consumptions",
+        () =>
+          apiClient.patch<TripConsumptionRow, Partial<TripConsumptionPayload>>(
+            `/api/trips/${tripId}/expenses/consumptions/${id}`,
+            payload,
+          ),
+        participantIds,
+      ),
     deleteTripConsumption: (id: string) =>
       invokeAction(() => apiClient.del(`/api/trips/${tripId}/expenses/consumptions/${id}`)),
-    createTripAccommodation: (payload: TripAccommodationPayload) =>
-      invokeAction(() => apiClient.post(`/api/trips/${tripId}/expenses/accommodations`, payload)),
-    updateTripAccommodation: (id: string, payload: Partial<TripAccommodationPayload>) =>
-      invokeAction(() =>
-        apiClient.patch(`/api/trips/${tripId}/expenses/accommodations/${id}`, payload),
+    createTripAccommodation: (payload: TripAccommodationPayload, participantIds: string[]) =>
+      createExpenseWithParticipants(
+        "trip_accommodations",
+        () =>
+          apiClient.post<TripAccommodationRow, TripAccommodationPayload>(
+            `/api/trips/${tripId}/expenses/accommodations`,
+            payload,
+          ),
+        participantIds,
+      ),
+    updateTripAccommodation: (
+      id: string,
+      payload: Partial<TripAccommodationPayload>,
+      participantIds: string[],
+    ) =>
+      updateExpenseWithParticipants(
+        "trip_accommodations",
+        () =>
+          apiClient.patch<TripAccommodationRow, Partial<TripAccommodationPayload>>(
+            `/api/trips/${tripId}/expenses/accommodations/${id}`,
+            payload,
+          ),
+        participantIds,
       ),
     deleteTripAccommodation: (id: string) =>
       invokeAction(() => apiClient.del(`/api/trips/${tripId}/expenses/accommodations/${id}`)),

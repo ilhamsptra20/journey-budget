@@ -16,17 +16,19 @@ type TabsProps = {
 
 export function Tabs({ items, value, onChange, className }: TabsProps) {
   return (
-    <div className={cn("flex flex-wrap gap-2", className)}>
-      {items.map((tab) => (
-        <TabButton
-          key={tab.key}
-          type="button"
-          active={tab.key === value}
-          onClick={() => onChange(tab.key)}
-        >
-          {tab.label}
-        </TabButton>
-      ))}
+    <div className={cn("overflow-x-auto", className)}>
+      <div className="flex min-w-max gap-2 pb-1">
+        {items.map((tab) => (
+          <TabButton
+            key={tab.key}
+            type="button"
+            active={tab.key === value}
+            onClick={() => onChange(tab.key)}
+          >
+            {tab.label}
+          </TabButton>
+        ))}
+      </div>
     </div>
   );
 }
