@@ -7,22 +7,22 @@ import { tripService } from "@/modules/trips/trip.service";
 
 export const GET = withHandler(async (request: NextRequest, context) => {
   allowGuestReadOnly(request);
-  const { id } = await resolveParams<{ id: string }>(context);
-  const result = await tripService.detail(id);
+  const { tripId } = await resolveParams<{ tripId: string }>(context);
+  const result = await tripService.detail(tripId);
   return successResponse(result.message, result.data);
 });
 
 export const PATCH = withHandler(async (request: NextRequest, context) => {
   allowGuestReadOnly(request);
-  const { id } = await resolveParams<{ id: string }>(context);
+  const { tripId } = await resolveParams<{ tripId: string }>(context);
   const body = await readJsonBody(request);
-  const result = await tripService.update(id, body);
+  const result = await tripService.update(tripId, body);
   return successResponse(result.message, result.data);
 });
 
 export const DELETE = withHandler(async (request: NextRequest, context) => {
   allowGuestReadOnly(request);
-  const { id } = await resolveParams<{ id: string }>(context);
-  const result = await tripService.remove(id);
+  const { tripId } = await resolveParams<{ tripId: string }>(context);
+  const result = await tripService.remove(tripId);
   return successResponse(result.message, result.data);
 });
