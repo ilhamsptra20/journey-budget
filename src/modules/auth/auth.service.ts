@@ -72,7 +72,7 @@ class AuthService {
       throw new UnauthorizedError("Invalid email or password");
     }
 
-    const passwordMatch = await verifyPassword(user.passwordHash, parsed.data.password);
+    const passwordMatch = await verifyPassword(parsed.data.password, user.passwordHash);
     if (!passwordMatch) {
       throw new UnauthorizedError("Invalid email or password");
     }
