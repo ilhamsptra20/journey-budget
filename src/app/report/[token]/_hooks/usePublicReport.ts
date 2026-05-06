@@ -38,6 +38,7 @@ export type PublicReportData = {
       acquisition_type: string;
       scope: string;
       cost_type: string;
+      participants_count?: number;
       price: number | null;
       count: number;
       duration: number | null;
@@ -49,6 +50,7 @@ export type PublicReportData = {
       unit: string;
       time: string;
       scope: string;
+      participants_count?: number;
       price: number;
       count: number;
       amount: number;
@@ -58,6 +60,7 @@ export type PublicReportData = {
       category: string;
       unit: string;
       scope: string;
+      participants_count?: number;
       price: number;
       count: number;
       amount: number;

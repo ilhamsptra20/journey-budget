@@ -67,6 +67,7 @@ export function PublicReportPageContent({ token }: PublicReportPageContentProps)
           saldoTrip={report.saldo_trip}
         />
         <PublicExpenseBreakdown
+          membersCount={report.members_count}
           logistics={report.breakdown.logistics}
           consumptions={report.breakdown.consumptions}
           accommodations={report.breakdown.accommodations}

@@ -68,6 +68,7 @@ class SummaryRepository {
     const db = getDb();
     return db
       .select({
+        id: tripLogistics.id,
         title: logisticItems.title,
         unit: logisticItems.unit,
         acquisitionType: tripLogistics.acquisitionType,
@@ -86,6 +87,7 @@ class SummaryRepository {
     const db = getDb();
     return db
       .select({
+        id: tripConsumptions.id,
         title: consumptionItems.title,
         category: consumptionItems.category,
         unit: consumptionItems.unit,
@@ -103,6 +105,7 @@ class SummaryRepository {
     const db = getDb();
     return db
       .select({
+        id: tripAccommodations.id,
         title: accommodationItems.title,
         category: accommodationItems.category,
         unit: accommodationItems.unit,

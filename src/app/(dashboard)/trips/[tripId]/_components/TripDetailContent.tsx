@@ -34,9 +34,14 @@ import {
 } from "@/ui/components";
 import { useAuth } from "@/ui/providers/AuthProvider";
 import {
+  calculateAccommodationsTotal,
   calculateAccommodationSubtotal,
+  calculateConsumptionsTotal,
   calculateConsumptionSubtotal,
+  calculateExpenseParticipantsCount,
+  calculateLogisticsTotal,
   calculateLogisticSubtotal,
+  calculateParticipantShare,
 } from "@/ui/utils/calculate";
 import { formatCurrencyIDR, formatDate } from "@/ui/utils/format";
 import {
@@ -258,6 +263,65 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
     () => accommodationItems.map((item) => toOption(item.id, item.title, item)),
     [accommodationItems],
   );
+
+  const logisticsTotal = useMemo(
+    () =>
+      calculateLogisticsTotal(
+        tripLogistics.map((row) => ({
+          costType: row.costType,
+          acquisitionType: row.acquisitionType,
+          price: row.price,
+          count: row.count,
+          duration: row.duration,
+        })),
+      ),
+    [tripLogistics],
+  );
+
+  const consumptionsTotal = useMemo(
+    () =>
+      calculateConsumptionsTotal(
+        tripConsumptions.map((row) => ({
+          price: row.price,
+          count: row.count,
+        })),
+      ),
+    [tripConsumptions],
+  );
+
+  const accommodationsTotal = useMemo(
+    () =>
+      calculateAccommodationsTotal(
+        tripAccommodations.map((row) => ({
+          price: row.price,
+          count: row.count,
+        })),
+      ),
+    [tripAccommodations],
+  );
+
+  const getExpenseShareMeta = (
+    expenseType: ExpenseType,
+    expenseId: string,
+    scope: "group" | "personal",
+    subtotal: number,
+    isFree = false,
+  ) => {
+    const explicitParticipantsCount = getExpenseParticipantsMemberIds(expenseType, expenseId).length;
+    const participantsCount = calculateExpenseParticipantsCount({
+      scope,
+      participantsCount: explicitParticipantsCount,
+      tripMembersCount: tripMembers.length,
+    });
+    const isAllMembers = scope === "group" && explicitParticipantsCount === 0;
+    const share = isFree ? 0 : calculateParticipantShare(subtotal, participantsCount);
+
+    return {
+      participantsCount,
+      share,
+      isAllMembers,
+    };
+  };
 
   const copyTextToClipboard = async (text: string) => {
     if (!text || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
@@ -621,6 +685,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
             setOpenLogisticModal(true);
           }}
         >
+          <SectionSubtotal label="Total Logistik" value={logisticsTotal} />
           <DataTable
             data={tripLogistics}
             rowKey={(row) => row.id}
@@ -641,6 +706,17 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                     duration: row.duration,
                   });
                   const isFree = row.costType === "free";
+                  const shareMeta = getExpenseShareMeta(
+                    "trip_logistics",
+                    row.id,
+                    row.scope,
+                    subtotal,
+                    isFree,
+                  );
+                  const participantsText =
+                    shareMeta.isAllMembers
+                      ? "Semua anggota"
+                      : `${shareMeta.participantsCount} peserta`;
 
                   return (
                     <div className="min-w-0">
@@ -661,6 +737,11 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                             </Badge>
                           ) : null}
                         </p>
+                        {!isFree && shareMeta.participantsCount > 0 ? (
+                          <p>
+                            {participantsText} • {formatCurrencyIDR(shareMeta.share)}/orang
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -709,6 +790,17 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                     count: row.count,
                     duration: row.duration,
                   });
+                  const shareMeta = getExpenseShareMeta(
+                    "trip_logistics",
+                    row.id,
+                    row.scope,
+                    subtotal,
+                    row.costType === "free",
+                  );
+                  const participantsText =
+                    shareMeta.isAllMembers
+                      ? "Semua anggota"
+                      : `${shareMeta.participantsCount} peserta`;
 
                   if (row.costType === "free") {
                     return (
@@ -719,7 +811,16 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                     );
                   }
 
-                  return formatCurrencyIDR(subtotal);
+                  return (
+                    <div>
+                      <p>{formatCurrencyIDR(subtotal)}</p>
+                      {shareMeta.participantsCount > 0 ? (
+                        <p className="mt-0.5 text-xs font-normal text-slate-500">
+                          {participantsText} • {formatCurrencyIDR(shareMeta.share)}/orang
+                        </p>
+                      ) : null}
+                    </div>
+                  );
                 },
               },
               {
@@ -769,6 +870,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
             setOpenConsumptionModal(true);
           }}
         >
+          <SectionSubtotal label="Total Konsumsi" value={consumptionsTotal} />
           <DataTable
             data={tripConsumptions}
             rowKey={(row) => row.id}
@@ -782,6 +884,16 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                   consumptionItems.find((item) => item.id === row.consumptionItemId)?.title ?? "-",
                 cell: (row) => {
                   const subtotal = calculateConsumptionSubtotal({ price: row.price, count: row.count });
+                  const shareMeta = getExpenseShareMeta(
+                    "trip_consumptions",
+                    row.id,
+                    row.scope,
+                    subtotal,
+                  );
+                  const participantsText =
+                    shareMeta.isAllMembers
+                      ? "Semua anggota"
+                      : `${shareMeta.participantsCount} peserta`;
 
                   return (
                     <div className="min-w-0">
@@ -794,6 +906,11 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                         <p className="font-semibold text-slate-800">
                           Subtotal: {formatCurrencyIDR(subtotal)}
                         </p>
+                        {shareMeta.participantsCount > 0 ? (
+                          <p>
+                            {participantsText} • {formatCurrencyIDR(shareMeta.share)}/orang
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -815,10 +932,30 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                 accessor: (row) => calculateConsumptionSubtotal({ price: row.price, count: row.count }),
                 numeric: true,
                 className: "font-semibold text-slate-900",
-                cell: (row) =>
-                  formatCurrencyIDR(
-                    calculateConsumptionSubtotal({ price: row.price, count: row.count }),
-                  ),
+                cell: (row) => {
+                  const subtotal = calculateConsumptionSubtotal({ price: row.price, count: row.count });
+                  const shareMeta = getExpenseShareMeta(
+                    "trip_consumptions",
+                    row.id,
+                    row.scope,
+                    subtotal,
+                  );
+                  const participantsText =
+                    shareMeta.isAllMembers
+                      ? "Semua anggota"
+                      : `${shareMeta.participantsCount} peserta`;
+
+                  return (
+                    <div>
+                      <p>{formatCurrencyIDR(subtotal)}</p>
+                      {shareMeta.participantsCount > 0 ? (
+                        <p className="mt-0.5 text-xs font-normal text-slate-500">
+                          {participantsText} • {formatCurrencyIDR(shareMeta.share)}/orang
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                },
               },
               {
                 id: "actions",
@@ -867,6 +1004,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
             setOpenAccommodationModal(true);
           }}
         >
+          <SectionSubtotal label="Total Akomodasi" value={accommodationsTotal} />
           <DataTable
             data={tripAccommodations}
             rowKey={(row) => row.id}
@@ -880,6 +1018,16 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                   accommodationItems.find((item) => item.id === row.accommodationItemId)?.title ?? "-",
                 cell: (row) => {
                   const subtotal = calculateAccommodationSubtotal({ price: row.price, count: row.count });
+                  const shareMeta = getExpenseShareMeta(
+                    "trip_accommodations",
+                    row.id,
+                    row.scope,
+                    subtotal,
+                  );
+                  const participantsText =
+                    shareMeta.isAllMembers
+                      ? "Semua anggota"
+                      : `${shareMeta.participantsCount} peserta`;
 
                   return (
                     <div className="min-w-0">
@@ -892,6 +1040,11 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                         <p className="font-semibold text-slate-800">
                           Subtotal: {formatCurrencyIDR(subtotal)}
                         </p>
+                        {shareMeta.participantsCount > 0 ? (
+                          <p>
+                            {participantsText} • {formatCurrencyIDR(shareMeta.share)}/orang
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -913,10 +1066,30 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                   calculateAccommodationSubtotal({ price: row.price, count: row.count }),
                 numeric: true,
                 className: "font-semibold text-slate-900",
-                cell: (row) =>
-                  formatCurrencyIDR(
-                    calculateAccommodationSubtotal({ price: row.price, count: row.count }),
-                  ),
+                cell: (row) => {
+                  const subtotal = calculateAccommodationSubtotal({ price: row.price, count: row.count });
+                  const shareMeta = getExpenseShareMeta(
+                    "trip_accommodations",
+                    row.id,
+                    row.scope,
+                    subtotal,
+                  );
+                  const participantsText =
+                    shareMeta.isAllMembers
+                      ? "Semua anggota"
+                      : `${shareMeta.participantsCount} peserta`;
+
+                  return (
+                    <div>
+                      <p>{formatCurrencyIDR(subtotal)}</p>
+                      {shareMeta.participantsCount > 0 ? (
+                        <p className="mt-0.5 text-xs font-normal text-slate-500">
+                          {participantsText} • {formatCurrencyIDR(shareMeta.share)}/orang
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                },
               },
               {
                 id: "actions",
@@ -1296,6 +1469,15 @@ function ExpenseSection({
         )}
       </div>
       {children}
+    </div>
+  );
+}
+
+function SectionSubtotal({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-900">{formatCurrencyIDR(value)}</p>
     </div>
   );
 }

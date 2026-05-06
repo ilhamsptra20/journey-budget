@@ -235,6 +235,28 @@ class SummaryService {
       summaryRepository.getPublicAccommodationsBreakdown(trip.id),
     ]);
 
+    const [logisticParticipants, consumptionParticipants, accommodationParticipants] =
+      await Promise.all([
+      summaryRepository.getExpenseParticipants(
+        "trip_logistics",
+        logisticsIdsFromTrip(logistics),
+      ),
+      summaryRepository.getExpenseParticipants(
+        "trip_consumptions",
+        consumptionsIdsFromTrip(consumptions),
+      ),
+      summaryRepository.getExpenseParticipants(
+        "trip_accommodations",
+        accommodationsIdsFromTrip(accommodations),
+      ),
+    ]);
+
+    const participantMap = buildParticipantMap([
+      ...logisticParticipants,
+      ...consumptionParticipants,
+      ...accommodationParticipants,
+    ]);
+
     return {
       message: "Public report retrieved successfully",
       data: {
@@ -257,6 +279,12 @@ class SummaryService {
         })),
         breakdown: {
           logistics: logistics.map((row) => ({
+            participants_count: calculateExpenseParticipantsCountForPublic({
+              key: `trip_logistics:${row.id}`,
+              scope: row.scope,
+              membersCount: summaryResult.data.members_count,
+              participantMap,
+            }),
             item: row.title,
             unit: row.unit,
             acquisition_type: row.acquisitionType,
@@ -276,6 +304,12 @@ class SummaryService {
             ),
           })),
           consumptions: consumptions.map((row) => ({
+            participants_count: calculateExpenseParticipantsCountForPublic({
+              key: `trip_consumptions:${row.id}`,
+              scope: row.scope,
+              membersCount: summaryResult.data.members_count,
+              participantMap,
+            }),
             item: row.title,
             category: row.category,
             unit: row.unit,
@@ -286,6 +320,12 @@ class SummaryService {
             amount: toMoney(row.price * row.count),
           })),
           accommodations: accommodations.map((row) => ({
+            participants_count: calculateExpenseParticipantsCountForPublic({
+              key: `trip_accommodations:${row.id}`,
+              scope: row.scope,
+              membersCount: summaryResult.data.members_count,
+              participantMap,
+            }),
             item: row.title,
             category: row.category,
             unit: row.unit,
@@ -298,6 +338,29 @@ class SummaryService {
       },
     };
   }
+}
+
+function calculateExpenseParticipantsCountForPublic({
+  key,
+  scope,
+  membersCount,
+  participantMap,
+}: {
+  key: string;
+  scope: "group" | "personal";
+  membersCount: number;
+  participantMap: Map<string, string[]>;
+}) {
+  const explicitCount = participantMap.get(key)?.length ?? 0;
+  if (explicitCount > 0) {
+    return explicitCount;
+  }
+
+  if (scope === "group") {
+    return membersCount;
+  }
+
+  return 0;
 }
 
 function logisticsIdsFromTrip(
