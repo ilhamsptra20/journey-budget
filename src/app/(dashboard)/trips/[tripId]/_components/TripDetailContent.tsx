@@ -22,9 +22,6 @@ import {
   AutocompleteOption,
   Badge,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
   DataTable,
   EmptyState,
   IconButton,
@@ -227,6 +224,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   } = useTripDetail(tripId);
 
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [isDesktop, setIsDesktop] = useState(false);
   const [publicShareLink, setPublicShareLink] = useState("");
   const [publicShareLoading, setPublicShareLoading] = useState(false);
   const [publicShareLoadingText, setPublicShareLoadingText] = useState("Menyimpan data...");
@@ -498,6 +496,24 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   };
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const applyDesktopState = () => {
+      setIsDesktop(mediaQuery.matches);
+    };
+
+    applyDesktopState();
+    mediaQuery.addEventListener("change", applyDesktopState);
+
+    return () => {
+      mediaQuery.removeEventListener("change", applyDesktopState);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!trip?.publicReportEnabled && publicShareLink) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPublicShareLink("");
@@ -707,8 +723,13 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
             setOpenLogisticModal(true);
           }}
         >
-          <ExpenseSectionCard title="Logistik" total={logisticsTotal}>
-            <ExpenseAccordionList
+          <ExpenseSectionCard
+            sectionId="logistics-section"
+            title="Logistik"
+            total={logisticsTotal}
+            defaultOpen={isDesktop}
+          >
+            <ExpenseItemList
               rows={tripLogistics.map((row) => {
                 const itemTitle = logisticItems.find((item) => item.id === row.logisticItemId)?.title ?? "-";
                 const participantsMeta = getExpenseParticipantsMeta(
@@ -807,8 +828,13 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
             setOpenConsumptionModal(true);
           }}
         >
-          <ExpenseSectionCard title="Konsumsi" total={consumptionsTotal}>
-            <ExpenseAccordionList
+          <ExpenseSectionCard
+            sectionId="consumptions-section"
+            title="Konsumsi"
+            total={consumptionsTotal}
+            defaultOpen={isDesktop}
+          >
+            <ExpenseItemList
               rows={tripConsumptions.map((row) => {
                 const item = consumptionItems.find((masterItem) => masterItem.id === row.consumptionItemId);
                 const participantsMeta = getExpenseParticipantsMeta(
@@ -894,8 +920,13 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
             setOpenAccommodationModal(true);
           }}
         >
-          <ExpenseSectionCard title="Akomodasi" total={accommodationsTotal}>
-            <ExpenseAccordionList
+          <ExpenseSectionCard
+            sectionId="accommodations-section"
+            title="Akomodasi"
+            total={accommodationsTotal}
+            defaultOpen={isDesktop}
+          >
+            <ExpenseItemList
               rows={tripAccommodations.map((row) => {
                 const item = accommodationItems.find(
                   (masterItem) => masterItem.id === row.accommodationItemId,
@@ -1315,28 +1346,38 @@ function ExpenseSection({
 }
 
 function ExpenseSectionCard({
+  sectionId,
   title,
   total,
+  defaultOpen,
   children,
 }: {
+  sectionId: string;
   title: string;
   total: number;
+  defaultOpen: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <CubeIcon className="h-4 w-4 text-slate-500" />
-          <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        </div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-right">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Total</p>
-          <p className="text-xs font-semibold text-slate-900">{formatCurrencyIDR(total)}</p>
-        </div>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
+    <Accordion key={`${sectionId}-${defaultOpen ? "desktop" : "mobile"}`} defaultOpen={defaultOpen}>
+      <AccordionItem value={sectionId} className="rounded-lg border border-slate-200 bg-white">
+        <AccordionTrigger className="px-0 py-0 hover:bg-white">
+          <div className="flex min-w-0 items-center justify-between gap-2 px-5 py-4">
+            <div className="flex items-center gap-2">
+              <CubeIcon className="h-4 w-4 text-slate-500" />
+              <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-right">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Total</p>
+              <p className="text-xs font-semibold text-slate-900">{formatCurrencyIDR(total)}</p>
+            </div>
+          </div>
+        </AccordionTrigger>
+        <AccordionContent>
+          <div className="border-t border-slate-100 px-5 py-4">{children}</div>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   );
 }
 
@@ -1353,7 +1394,7 @@ type ExpenseAccordionRow = {
   actions?: React.ReactNode;
 };
 
-function ExpenseAccordionList({
+function ExpenseItemList({
   rows,
   emptyTitle,
   emptyDescription,
@@ -1367,61 +1408,57 @@ function ExpenseAccordionList({
   }
 
   return (
-    <Accordion multiple>
+    <div className="space-y-2">
       {rows.map((row) => (
-        <AccordionItem key={row.id} value={row.id}>
-          <AccordionTrigger className="px-4 py-3">
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900">{row.title}</p>
-                {row.badges && row.badges.length > 0 ? (
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {row.badges.map((badge, index) => (
-                      <Badge
-                        key={`${row.id}-badge-${badge.label}-${index}`}
-                        tone={badge.tone ?? "default"}
-                        className="px-2 py-0.5 text-[11px]"
-                      >
-                        {badge.label}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
-                <p className="mt-1 text-xs text-slate-500">{row.summary}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Subtotal</p>
-                <div className="mt-1 flex items-center justify-end gap-2">
-                  <p className="text-sm font-semibold text-slate-900">{formatCurrencyIDR(row.subtotal)}</p>
-                  {row.isFree ? <Badge className="px-2 py-0.5 text-[11px]">Gratis</Badge> : null}
-                </div>
-              </div>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent>
-            <div className="border-t border-slate-100 px-4 pb-4 pt-3">
-              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-                {row.details.map((detail, index) => (
-                  <div key={`${row.id}-detail-${detail.label}-${index}`} className="contents">
-                    <p className="text-xs text-slate-500">{detail.label}</p>
-                    <p
-                      className={
-                        detail.highlight
-                          ? "text-right text-sm font-semibold text-slate-900"
-                          : "text-right text-sm text-slate-700"
-                      }
+        <div key={row.id} className="rounded-md border border-slate-100 bg-slate-50 p-3">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-900">{row.title}</p>
+              {row.badges && row.badges.length > 0 ? (
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  {row.badges.map((badge, index) => (
+                    <Badge
+                      key={`${row.id}-badge-${badge.label}-${index}`}
+                      tone={badge.tone ?? "default"}
+                      className="px-2 py-0.5 text-[11px]"
                     >
-                      {detail.value}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              {row.actions ? <div className="mt-3 border-t border-slate-100 pt-3">{row.actions}</div> : null}
+                      {badge.label}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+              <p className="mt-1 text-xs text-slate-500">{row.summary}</p>
             </div>
-          </AccordionContent>
-        </AccordionItem>
+            <div className="shrink-0 text-right">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Subtotal</p>
+              <div className="mt-1 flex items-center justify-end gap-2">
+                <p className="text-sm font-semibold text-slate-900">{formatCurrencyIDR(row.subtotal)}</p>
+                {row.isFree ? <Badge className="px-2 py-0.5 text-[11px]">Gratis</Badge> : null}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 border-t border-slate-200 pt-2">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+              {row.details.map((detail, index) => (
+                <div key={`${row.id}-detail-${detail.label}-${index}`} className="contents">
+                  <p className="text-xs text-slate-500">{detail.label}</p>
+                  <p
+                    className={
+                      detail.highlight
+                        ? "text-right text-sm font-semibold text-slate-900"
+                        : "text-right text-sm text-slate-700"
+                    }
+                  >
+                    {detail.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+          {row.actions ? <div className="mt-3 border-t border-slate-200 pt-2">{row.actions}</div> : null}
+        </div>
       ))}
-    </Accordion>
+    </div>
   );
 }
 
