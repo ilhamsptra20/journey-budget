@@ -9,6 +9,7 @@ import { cn } from "@/ui/utils/cn";
 export type AutocompleteOption = {
   value: string;
   label: string;
+  meta?: unknown;
 };
 
 type AutocompleteProps = {

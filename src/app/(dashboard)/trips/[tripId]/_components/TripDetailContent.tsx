@@ -29,9 +29,12 @@ import { formatCurrencyIDR, formatDate } from "@/ui/utils/format";
 import { mapValidationErrors } from "@/ui/utils/validation";
 
 import {
+  AccommodationItem,
+  ConsumptionItem,
   ExpenseType,
   FundPayload,
   FundRow,
+  LogisticItem,
   TripAccommodationPayload,
   TripAccommodationRow,
   TripConsumptionPayload,
@@ -128,8 +131,16 @@ function parseNumber(value: string) {
   return next;
 }
 
-function toOption(value: string, label: string): AutocompleteOption {
-  return { value, label };
+function toOption<TMeta>(value: string, label: string, meta?: TMeta): AutocompleteOption {
+  return { value, label, meta };
+}
+
+function getOptionMeta<TMeta>(option: AutocompleteOption | null): TMeta | null {
+  if (!option || !option.meta) {
+    return null;
+  }
+
+  return option.meta as TMeta;
 }
 
 function participantIdsFromMap(
@@ -208,15 +219,15 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   }, [allMembers, tripMembers]);
 
   const logisticOptions = useMemo(
-    () => logisticItems.map((item) => toOption(item.id, item.title)),
+    () => logisticItems.map((item) => toOption(item.id, item.title, item)),
     [logisticItems],
   );
   const consumptionOptions = useMemo(
-    () => consumptionItems.map((item) => toOption(item.id, item.title)),
+    () => consumptionItems.map((item) => toOption(item.id, item.title, item)),
     [consumptionItems],
   );
   const accommodationOptions = useMemo(
-    () => accommodationItems.map((item) => toOption(item.id, item.title)),
+    () => accommodationItems.map((item) => toOption(item.id, item.title, item)),
     [accommodationItems],
   );
 
@@ -692,7 +703,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
         }}
         onCreateMasterItem={async (keyword) => {
           const created = await createLogisticMasterItem(keyword);
-          return toOption(created.id, created.title);
+          return toOption(created.id, created.title, created);
         }}
         onSubmit={async (payload, participantIds) => {
           if (editingLogistic) {
@@ -725,7 +736,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
         }}
         onCreateMasterItem={async (keyword) => {
           const created = await createConsumptionMasterItem(keyword);
-          return toOption(created.id, created.title);
+          return toOption(created.id, created.title, created);
         }}
         onSubmit={async (payload, participantIds) => {
           if (editingConsumption) {
@@ -758,7 +769,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
         }}
         onCreateMasterItem={async (keyword) => {
           const created = await createAccommodationMasterItem(keyword);
-          return toOption(created.id, created.title);
+          return toOption(created.id, created.title, created);
         }}
         onSubmit={async (payload, participantIds) => {
           if (editingAccommodation) {
@@ -956,8 +967,38 @@ function TripLogisticModal({
     setFieldErrors({});
   }, [open, initialData, initialParticipantIds, options]);
 
+  const selectedLogisticItem = getOptionMeta<LogisticItem>(form.item);
   const isSewa = form.acquisition_type === "sewa";
   const isPaid = form.cost_type === "paid";
+  const priceHint = !isPaid
+    ? selectedLogisticItem
+      ? "Item ini tidak dihitung ke total biaya. Terisi otomatis dari master item, masih bisa diubah."
+      : "Item ini tidak dihitung ke total biaya."
+    : selectedLogisticItem
+      ? "Terisi otomatis dari master item, masih bisa diubah."
+      : undefined;
+
+  const handleLogisticItemChange = (item: AutocompleteOption | null) => {
+    setForm((prev) => {
+      if (!item) {
+        return { ...prev, item: null, price: "" };
+      }
+
+      if (prev.item?.value === item.value) {
+        return { ...prev, item };
+      }
+
+      const nextMasterItem = getOptionMeta<LogisticItem>(item);
+      return {
+        ...prev,
+        item,
+        price:
+          nextMasterItem?.defaultPrice !== null && nextMasterItem?.defaultPrice !== undefined
+            ? String(nextMasterItem.defaultPrice)
+            : "",
+      };
+    });
+  };
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -1046,10 +1087,17 @@ function TripLogisticModal({
           label="Logistic Item"
           value={form.item}
           options={options}
-          onChange={(item) => setForm((prev) => ({ ...prev, item }))}
+          onChange={handleLogisticItemChange}
           onCreateOption={onCreateMasterItem}
           createText={(keyword) => `Buat item baru: ${keyword}`}
           error={fieldErrors.logistic_item_id}
+        />
+
+        <Input
+          label="Unit (Master)"
+          value={selectedLogisticItem?.unit ?? "-"}
+          disabled
+          readOnly
         />
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -1108,7 +1156,7 @@ function TripLogisticModal({
             value={form.price}
             onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
             error={fieldErrors.price}
-            hint={!isPaid ? "Item ini tidak dihitung ke total biaya" : undefined}
+            hint={priceHint}
           />
         </div>
 
@@ -1204,6 +1252,30 @@ function TripConsumptionModal({
     setFieldErrors({});
   }, [open, initialData, initialParticipantIds, options]);
 
+  const selectedConsumptionItem = getOptionMeta<ConsumptionItem>(form.item);
+
+  const handleConsumptionItemChange = (item: AutocompleteOption | null) => {
+    setForm((prev) => {
+      if (!item) {
+        return { ...prev, item: null, price: "" };
+      }
+
+      if (prev.item?.value === item.value) {
+        return { ...prev, item };
+      }
+
+      const nextMasterItem = getOptionMeta<ConsumptionItem>(item);
+      return {
+        ...prev,
+        item,
+        price:
+          nextMasterItem?.defaultPrice !== null && nextMasterItem?.defaultPrice !== undefined
+            ? String(nextMasterItem.defaultPrice)
+            : "",
+      };
+    });
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setError("");
@@ -1282,11 +1354,26 @@ function TripConsumptionModal({
           label="Consumption Item"
           value={form.item}
           options={options}
-          onChange={(item) => setForm((prev) => ({ ...prev, item }))}
+          onChange={handleConsumptionItemChange}
           onCreateOption={onCreateMasterItem}
           createText={(keyword) => `Buat item baru: ${keyword}`}
           error={fieldErrors.consumption_item_id}
         />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Input
+            label="Category (Master)"
+            value={selectedConsumptionItem?.category ?? "-"}
+            disabled
+            readOnly
+          />
+          <Input
+            label="Unit (Master)"
+            value={selectedConsumptionItem?.unit ?? "-"}
+            disabled
+            readOnly
+          />
+        </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <Select
@@ -1332,6 +1419,11 @@ function TripConsumptionModal({
             value={form.price}
             onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
             error={fieldErrors.price}
+            hint={
+              selectedConsumptionItem
+                ? "Terisi otomatis dari master item, masih bisa diubah."
+                : undefined
+            }
           />
           <Input
             label="Count"
@@ -1413,6 +1505,30 @@ function TripAccommodationModal({
     setFieldErrors({});
   }, [open, initialData, initialParticipantIds, options]);
 
+  const selectedAccommodationItem = getOptionMeta<AccommodationItem>(form.item);
+
+  const handleAccommodationItemChange = (item: AutocompleteOption | null) => {
+    setForm((prev) => {
+      if (!item) {
+        return { ...prev, item: null, price: "" };
+      }
+
+      if (prev.item?.value === item.value) {
+        return { ...prev, item };
+      }
+
+      const nextMasterItem = getOptionMeta<AccommodationItem>(item);
+      return {
+        ...prev,
+        item,
+        price:
+          nextMasterItem?.defaultPrice !== null && nextMasterItem?.defaultPrice !== undefined
+            ? String(nextMasterItem.defaultPrice)
+            : "",
+      };
+    });
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setError("");
@@ -1490,11 +1606,26 @@ function TripAccommodationModal({
           label="Accommodation Item"
           value={form.item}
           options={options}
-          onChange={(item) => setForm((prev) => ({ ...prev, item }))}
+          onChange={handleAccommodationItemChange}
           onCreateOption={onCreateMasterItem}
           createText={(keyword) => `Buat item baru: ${keyword}`}
           error={fieldErrors.accommodation_item_id}
         />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Input
+            label="Category (Master)"
+            value={selectedAccommodationItem?.category ?? "-"}
+            disabled
+            readOnly
+          />
+          <Input
+            label="Unit (Master)"
+            value={selectedAccommodationItem?.unit ?? "-"}
+            disabled
+            readOnly
+          />
+        </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <Select
@@ -1518,6 +1649,11 @@ function TripAccommodationModal({
             value={form.price}
             onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
             error={fieldErrors.price}
+            hint={
+              selectedAccommodationItem
+                ? "Terisi otomatis dari master item, masih bisa diubah."
+                : undefined
+            }
           />
         </div>
 
