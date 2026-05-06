@@ -17,19 +17,31 @@ export type LogisticSubtotalInput = {
   cost_type?: "paid" | "free" | string | null;
   acquisitionType?: "beli" | "sewa" | "bawa_sendiri" | "pinjam" | string | null;
   acquisition_type?: "beli" | "sewa" | "bawa_sendiri" | "pinjam" | string | null;
+  scope?: "group" | "personal" | string | null;
   price?: MaybeNumber;
   count?: MaybeNumber;
   duration?: MaybeNumber;
+  participantIds?: string[] | null;
+  participantsCount?: MaybeNumber;
+  tripMembersCount?: MaybeNumber;
 };
 
 export type ConsumptionSubtotalInput = {
+  scope?: "group" | "personal" | string | null;
   price?: MaybeNumber;
   count?: MaybeNumber;
+  participantIds?: string[] | null;
+  participantsCount?: MaybeNumber;
+  tripMembersCount?: MaybeNumber;
 };
 
 export type AccommodationSubtotalInput = {
+  scope?: "group" | "personal" | string | null;
   price?: MaybeNumber;
   count?: MaybeNumber;
+  participantIds?: string[] | null;
+  participantsCount?: MaybeNumber;
+  tripMembersCount?: MaybeNumber;
 };
 
 export type ExpenseParticipantsInput = {
@@ -38,6 +50,22 @@ export type ExpenseParticipantsInput = {
   participantsCount?: MaybeNumber;
   tripMembersCount?: MaybeNumber;
 };
+
+function applyScopeMultiplier({
+  scope,
+  baseAmount,
+  participantsCount,
+}: {
+  scope?: string | null;
+  baseAmount: number;
+  participantsCount: number;
+}) {
+  if (scope === "personal") {
+    return baseAmount * participantsCount;
+  }
+
+  return baseAmount;
+}
 
 export function calculateLogisticSubtotal(input: LogisticSubtotalInput) {
   const costType = input.costType ?? input.cost_type;
@@ -50,24 +78,54 @@ export function calculateLogisticSubtotal(input: LogisticSubtotalInput) {
   const price = toNonNegativeNumber(input.price);
   const count = toNonNegativeNumber(input.count);
 
-  if (acquisitionType === "sewa") {
-    const duration = toNonNegativeNumber(input.duration);
-    return price * count * duration;
-  }
+  const baseAmount = acquisitionType === "sewa"
+    ? price * count * toNonNegativeNumber(input.duration)
+    : price * count;
 
-  return price * count;
+  const participantsCount = calculateExpenseParticipantsCount({
+    scope: input.scope,
+    participantIds: input.participantIds,
+    participantsCount: input.participantsCount,
+    tripMembersCount: input.tripMembersCount,
+  });
+
+  return applyScopeMultiplier({
+    scope: input.scope,
+    baseAmount,
+    participantsCount,
+  });
 }
 
 export function calculateConsumptionSubtotal(input: ConsumptionSubtotalInput) {
-  const price = toNonNegativeNumber(input.price);
-  const count = toNonNegativeNumber(input.count);
-  return price * count;
+  const baseAmount = toNonNegativeNumber(input.price) * toNonNegativeNumber(input.count);
+  const participantsCount = calculateExpenseParticipantsCount({
+    scope: input.scope,
+    participantIds: input.participantIds,
+    participantsCount: input.participantsCount,
+    tripMembersCount: input.tripMembersCount,
+  });
+
+  return applyScopeMultiplier({
+    scope: input.scope,
+    baseAmount,
+    participantsCount,
+  });
 }
 
 export function calculateAccommodationSubtotal(input: AccommodationSubtotalInput) {
-  const price = toNonNegativeNumber(input.price);
-  const count = toNonNegativeNumber(input.count);
-  return price * count;
+  const baseAmount = toNonNegativeNumber(input.price) * toNonNegativeNumber(input.count);
+  const participantsCount = calculateExpenseParticipantsCount({
+    scope: input.scope,
+    participantIds: input.participantIds,
+    participantsCount: input.participantsCount,
+    tripMembersCount: input.tripMembersCount,
+  });
+
+  return applyScopeMultiplier({
+    scope: input.scope,
+    baseAmount,
+    participantsCount,
+  });
 }
 
 export function calculateExpenseParticipantsCount(input: ExpenseParticipantsInput) {
@@ -106,4 +164,28 @@ export function calculateConsumptionsTotal(items: ConsumptionSubtotalInput[]) {
 
 export function calculateAccommodationsTotal(items: AccommodationSubtotalInput[]) {
   return items.reduce((total, item) => total + calculateAccommodationSubtotal(item), 0);
+}
+
+export function calculateLogisticBaseAmount(input: LogisticSubtotalInput) {
+  const costType = input.costType ?? input.cost_type;
+  if (costType === "free") {
+    return 0;
+  }
+
+  const acquisitionType = input.acquisitionType ?? input.acquisition_type;
+  const price = toNonNegativeNumber(input.price);
+  const count = toNonNegativeNumber(input.count);
+  const duration = toNonNegativeNumber(input.duration);
+
+  return acquisitionType === "sewa"
+    ? price * count * duration
+    : price * count;
+}
+
+export function calculateConsumptionBaseAmount(input: ConsumptionSubtotalInput) {
+  return toNonNegativeNumber(input.price) * toNonNegativeNumber(input.count);
+}
+
+export function calculateAccommodationBaseAmount(input: AccommodationSubtotalInput) {
+  return toNonNegativeNumber(input.price) * toNonNegativeNumber(input.count);
 }

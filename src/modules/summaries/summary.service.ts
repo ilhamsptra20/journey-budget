@@ -7,6 +7,7 @@ type ExpenseRow = {
   id: string;
   amount: number;
   scope: "group" | "personal";
+  participants: string[];
 };
 
 const toMoney = (value: number) => Number(value.toFixed(2));
@@ -49,6 +50,46 @@ function buildParticipantMap(
   return result;
 }
 
+function resolveExpenseParticipants({
+  scope,
+  key,
+  participantMap,
+  tripMemberIds,
+}: {
+  scope: "group" | "personal";
+  key: string;
+  participantMap: Map<string, string[]>;
+  tripMemberIds: string[];
+}) {
+  const participants = participantMap.get(key) ?? [];
+
+  if (participants.length > 0) {
+    return participants;
+  }
+
+  if (scope === "group") {
+    return tripMemberIds;
+  }
+
+  return [];
+}
+
+function applyScopeSubtotal({
+  scope,
+  baseAmount,
+  participantsCount,
+}: {
+  scope: "group" | "personal";
+  baseAmount: number;
+  participantsCount: number;
+}) {
+  if (scope === "personal") {
+    return baseAmount * participantsCount;
+  }
+
+  return baseAmount;
+}
+
 class SummaryService {
   async getTripSummary(tripId: string) {
     const trip = await summaryRepository.getTripById(tripId);
@@ -83,18 +124,6 @@ class SummaryService {
 
     const membersCount = tripMembers.length;
 
-    const logisticTotal = logistics.reduce((total, row) => total + calculateLogisticAmount(row), 0);
-
-    const consumptionTotal = consumptions.reduce((total, row) => {
-      return total + row.price * row.count;
-    }, 0);
-
-    const accommodationTotal = accommodations.reduce((total, row) => {
-      return total + row.price * row.count;
-    }, 0);
-
-    const totalExpense = logisticTotal + consumptionTotal + accommodationTotal;
-
     const totalKolektif = fundRows
       .filter((row) => row.type === "kolektif")
       .reduce((total, row) => total + row.amount, 0);
@@ -103,36 +132,95 @@ class SummaryService {
       .filter((row) => row.type === "donatur")
       .reduce((total, row) => total + row.amount, 0);
 
-    const saldoTrip = totalKolektif + totalDonatur - totalExpense;
-
     const participantMap = buildParticipantMap([
       ...logisticParticipants,
       ...consumptionParticipants,
       ...accommodationParticipants,
     ]);
 
+    const tripMemberIds = tripMembers.map((member) => member.member_id);
+
     const expenseRows: ExpenseRow[] = [
-      ...logistics.map((row) => ({
-        type: "trip_logistics" as const,
-        id: row.id,
-        amount: calculateLogisticAmount(row),
-        scope: row.scope,
-      })),
-      ...consumptions.map((row) => ({
-        type: "trip_consumptions" as const,
-        id: row.id,
-        amount: row.price * row.count,
-        scope: row.scope,
-      })),
-      ...accommodations.map((row) => ({
-        type: "trip_accommodations" as const,
-        id: row.id,
-        amount: row.price * row.count,
-        scope: row.scope,
-      })),
+      ...logistics.map((row) => {
+        const key = `trip_logistics:${row.id}`;
+        const participants = resolveExpenseParticipants({
+          scope: row.scope,
+          key,
+          participantMap,
+          tripMemberIds,
+        });
+        const baseAmount = calculateLogisticAmount(row);
+
+        return {
+          type: "trip_logistics" as const,
+          id: row.id,
+          amount: applyScopeSubtotal({
+            scope: row.scope,
+            baseAmount,
+            participantsCount: participants.length,
+          }),
+          scope: row.scope,
+          participants,
+        };
+      }),
+      ...consumptions.map((row) => {
+        const key = `trip_consumptions:${row.id}`;
+        const participants = resolveExpenseParticipants({
+          scope: row.scope,
+          key,
+          participantMap,
+          tripMemberIds,
+        });
+        const baseAmount = row.price * row.count;
+
+        return {
+          type: "trip_consumptions" as const,
+          id: row.id,
+          amount: applyScopeSubtotal({
+            scope: row.scope,
+            baseAmount,
+            participantsCount: participants.length,
+          }),
+          scope: row.scope,
+          participants,
+        };
+      }),
+      ...accommodations.map((row) => {
+        const key = `trip_accommodations:${row.id}`;
+        const participants = resolveExpenseParticipants({
+          scope: row.scope,
+          key,
+          participantMap,
+          tripMemberIds,
+        });
+        const baseAmount = row.price * row.count;
+
+        return {
+          type: "trip_accommodations" as const,
+          id: row.id,
+          amount: applyScopeSubtotal({
+            scope: row.scope,
+            baseAmount,
+            participantsCount: participants.length,
+          }),
+          scope: row.scope,
+          participants,
+        };
+      }),
     ];
 
-    const tripMemberIds = tripMembers.map((member) => member.member_id);
+    const logisticTotal = expenseRows
+      .filter((row) => row.type === "trip_logistics")
+      .reduce((total, row) => total + row.amount, 0);
+    const consumptionTotal = expenseRows
+      .filter((row) => row.type === "trip_consumptions")
+      .reduce((total, row) => total + row.amount, 0);
+    const accommodationTotal = expenseRows
+      .filter((row) => row.type === "trip_accommodations")
+      .reduce((total, row) => total + row.amount, 0);
+    const totalExpense = logisticTotal + consumptionTotal + accommodationTotal;
+    const saldoTrip = totalKolektif + totalDonatur - totalExpense;
+
     const tagihanMap = new Map<string, number>();
 
     for (const memberId of tripMemberIds) {
@@ -140,19 +228,12 @@ class SummaryService {
     }
 
     for (const expense of expenseRows) {
-      const key = `${expense.type}:${expense.id}`;
-      let participants = participantMap.get(key) ?? [];
-
-      if (participants.length === 0 && expense.scope === "group") {
-        participants = tripMemberIds;
-      }
-
-      if (participants.length === 0) {
+      if (expense.participants.length === 0) {
         continue;
       }
 
-      const share = expense.amount / participants.length;
-      for (const memberId of participants) {
+      const share = expense.amount / expense.participants.length;
+      for (const memberId of expense.participants) {
         const current = tagihanMap.get(memberId) ?? 0;
         tagihanMap.set(memberId, current + share);
       }
@@ -278,62 +359,90 @@ class SummaryService {
           status: member.status,
         })),
         breakdown: {
-          logistics: logistics.map((row) => ({
-            participants_count: calculateExpenseParticipantsCountForPublic({
+          logistics: logistics.map((row) => {
+            const participantsCount = calculateExpenseParticipantsCountForPublic({
               key: `trip_logistics:${row.id}`,
               scope: row.scope,
               membersCount: summaryResult.data.members_count,
               participantMap,
-            }),
-            item: row.title,
-            unit: row.unit,
-            acquisition_type: row.acquisitionType,
-            scope: row.scope,
-            cost_type: row.costType,
-            price: row.price,
-            count: row.count,
-            duration: row.duration,
-            amount: toMoney(
-              calculateLogisticAmount({
-                acquisitionType: row.acquisitionType,
-                costType: row.costType,
-                price: row.price,
-                count: row.count,
-                duration: row.duration,
-              }),
-            ),
-          })),
-          consumptions: consumptions.map((row) => ({
-            participants_count: calculateExpenseParticipantsCountForPublic({
+            });
+
+            return {
+              participants_count: participantsCount,
+              item: row.title,
+              unit: row.unit,
+              acquisition_type: row.acquisitionType,
+              scope: row.scope,
+              cost_type: row.costType,
+              price: row.price,
+              count: row.count,
+              duration: row.duration,
+              amount: toMoney(
+                applyScopeSubtotal({
+                  scope: row.scope,
+                  baseAmount: calculateLogisticAmount({
+                    acquisitionType: row.acquisitionType,
+                    costType: row.costType,
+                    price: row.price,
+                    count: row.count,
+                    duration: row.duration,
+                  }),
+                  participantsCount,
+                }),
+              ),
+            };
+          }),
+          consumptions: consumptions.map((row) => {
+            const participantsCount = calculateExpenseParticipantsCountForPublic({
               key: `trip_consumptions:${row.id}`,
               scope: row.scope,
               membersCount: summaryResult.data.members_count,
               participantMap,
-            }),
-            item: row.title,
-            category: row.category,
-            unit: row.unit,
-            time: row.time,
-            scope: row.scope,
-            price: row.price,
-            count: row.count,
-            amount: toMoney(row.price * row.count),
-          })),
-          accommodations: accommodations.map((row) => ({
-            participants_count: calculateExpenseParticipantsCountForPublic({
+            });
+
+            return {
+              participants_count: participantsCount,
+              item: row.title,
+              category: row.category,
+              unit: row.unit,
+              time: row.time,
+              scope: row.scope,
+              price: row.price,
+              count: row.count,
+              amount: toMoney(
+                applyScopeSubtotal({
+                  scope: row.scope,
+                  baseAmount: row.price * row.count,
+                  participantsCount,
+                }),
+              ),
+            };
+          }),
+          accommodations: accommodations.map((row) => {
+            const participantsCount = calculateExpenseParticipantsCountForPublic({
               key: `trip_accommodations:${row.id}`,
               scope: row.scope,
               membersCount: summaryResult.data.members_count,
               participantMap,
-            }),
-            item: row.title,
-            category: row.category,
-            unit: row.unit,
-            scope: row.scope,
-            price: row.price,
-            count: row.count,
-            amount: toMoney(row.price * row.count),
-          })),
+            });
+
+            return {
+              participants_count: participantsCount,
+              item: row.title,
+              category: row.category,
+              unit: row.unit,
+              scope: row.scope,
+              price: row.price,
+              count: row.count,
+              amount: toMoney(
+                applyScopeSubtotal({
+                  scope: row.scope,
+                  baseAmount: row.price * row.count,
+                  participantsCount,
+                }),
+              ),
+            };
+          }),
         },
       },
     };

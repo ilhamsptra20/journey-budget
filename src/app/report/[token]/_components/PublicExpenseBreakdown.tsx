@@ -148,20 +148,21 @@ export function PublicExpenseBreakdown({
   accommodations,
 }: PublicExpenseBreakdownProps) {
   const logisticRows = logistics.map((row, index) => {
-    const computed = calculateLogisticSubtotal({
-      costType: row.cost_type,
-      acquisitionType: row.acquisition_type,
-      price: row.price,
-      count: row.count,
-      duration: row.duration,
-    });
-    const subtotal = Number.isFinite(row.amount) ? row.amount : computed;
-    const isFree = row.cost_type === "free";
     const participantsCount = calculateExpenseParticipantsCount({
       scope: row.scope,
       participantsCount: row.participants_count,
       tripMembersCount: membersCount,
     });
+    const subtotal = calculateLogisticSubtotal({
+      costType: row.cost_type,
+      acquisitionType: row.acquisition_type,
+      scope: row.scope,
+      price: row.price,
+      count: row.count,
+      duration: row.duration,
+      participantsCount,
+    });
+    const isFree = row.cost_type === "free";
     const isAllMembers = row.scope === "group" && participantsCount === membersCount;
     const participantsLabel =
       participantsCount > 0 ? (isAllMembers ? "Semua anggota" : `${participantsCount} peserta`) : undefined;
@@ -185,12 +186,16 @@ export function PublicExpenseBreakdown({
   });
 
   const consumptionRows = consumptions.map((row, index) => {
-    const computed = calculateConsumptionSubtotal({ price: row.price, count: row.count });
-    const subtotal = Number.isFinite(row.amount) ? row.amount : computed;
     const participantsCount = calculateExpenseParticipantsCount({
       scope: row.scope,
       participantsCount: row.participants_count,
       tripMembersCount: membersCount,
+    });
+    const subtotal = calculateConsumptionSubtotal({
+      scope: row.scope,
+      price: row.price,
+      count: row.count,
+      participantsCount,
     });
     const isAllMembers = row.scope === "group" && participantsCount === membersCount;
     const participantsLabel =
@@ -213,12 +218,16 @@ export function PublicExpenseBreakdown({
   });
 
   const accommodationRows = accommodations.map((row, index) => {
-    const computed = calculateAccommodationSubtotal({ price: row.price, count: row.count });
-    const subtotal = Number.isFinite(row.amount) ? row.amount : computed;
     const participantsCount = calculateExpenseParticipantsCount({
       scope: row.scope,
       participantsCount: row.participants_count,
       tripMembersCount: membersCount,
+    });
+    const subtotal = calculateAccommodationSubtotal({
+      scope: row.scope,
+      price: row.price,
+      count: row.count,
+      participantsCount,
     });
     const isAllMembers = row.scope === "group" && participantsCount === membersCount;
     const participantsLabel =
@@ -240,9 +249,45 @@ export function PublicExpenseBreakdown({
     };
   });
 
-  const logisticsTotal = calculateLogisticsTotal(logistics);
-  const consumptionsTotal = calculateConsumptionsTotal(consumptions);
-  const accommodationsTotal = calculateAccommodationsTotal(accommodations);
+  const logisticsTotal = calculateLogisticsTotal(
+    logistics.map((row) => ({
+      costType: row.cost_type,
+      acquisitionType: row.acquisition_type,
+      scope: row.scope,
+      price: row.price,
+      count: row.count,
+      duration: row.duration,
+      participantsCount: calculateExpenseParticipantsCount({
+        scope: row.scope,
+        participantsCount: row.participants_count,
+        tripMembersCount: membersCount,
+      }),
+    })),
+  );
+  const consumptionsTotal = calculateConsumptionsTotal(
+    consumptions.map((row) => ({
+      scope: row.scope,
+      price: row.price,
+      count: row.count,
+      participantsCount: calculateExpenseParticipantsCount({
+        scope: row.scope,
+        participantsCount: row.participants_count,
+        tripMembersCount: membersCount,
+      }),
+    })),
+  );
+  const accommodationsTotal = calculateAccommodationsTotal(
+    accommodations.map((row) => ({
+      scope: row.scope,
+      price: row.price,
+      count: row.count,
+      participantsCount: calculateExpenseParticipantsCount({
+        scope: row.scope,
+        participantsCount: row.participants_count,
+        tripMembersCount: membersCount,
+      }),
+    })),
+  );
 
   return (
     <section className="space-y-3">
