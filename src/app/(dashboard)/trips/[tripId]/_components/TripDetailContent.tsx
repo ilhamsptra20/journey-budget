@@ -33,6 +33,11 @@ import {
   Textarea,
 } from "@/ui/components";
 import { useAuth } from "@/ui/providers/AuthProvider";
+import {
+  calculateAccommodationSubtotal,
+  calculateConsumptionSubtotal,
+  calculateLogisticSubtotal,
+} from "@/ui/utils/calculate";
 import { formatCurrencyIDR, formatDate } from "@/ui/utils/format";
 import {
   confirmAction,
@@ -627,24 +632,96 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                 header: "Item",
                 accessor: (row) =>
                   logisticItems.find((item) => item.id === row.logisticItemId)?.title ?? "-",
-                cell: (row) => (
-                  <span className="font-medium text-slate-900">
-                    {logisticItems.find((item) => item.id === row.logisticItemId)?.title ?? "-"}
-                  </span>
-                ),
+                cell: (row) => {
+                  const subtotal = calculateLogisticSubtotal({
+                    costType: row.costType,
+                    acquisitionType: row.acquisitionType,
+                    price: row.price,
+                    count: row.count,
+                    duration: row.duration,
+                  });
+                  const isFree = row.costType === "free";
+
+                  return (
+                    <div className="min-w-0">
+                      <span className="font-medium text-slate-900">
+                        {logisticItems.find((item) => item.id === row.logisticItemId)?.title ?? "-"}
+                      </span>
+                      <div className="mt-1 space-y-0.5 text-xs text-slate-500 md:hidden">
+                        <p>Harga: {row.price !== null ? formatCurrencyIDR(row.price) : "-"}</p>
+                        <p>
+                          Jumlah: {row.count}
+                          {row.acquisitionType === "sewa" ? ` • Durasi: ${row.duration ?? "-"}` : ""}
+                        </p>
+                        <p className="font-semibold text-slate-800">
+                          Subtotal: {formatCurrencyIDR(subtotal)}
+                          {isFree ? (
+                            <Badge className="ml-2 align-middle" tone="default">
+                              Free
+                            </Badge>
+                          ) : null}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                },
               },
               { id: "acquisition", header: "Acquisition", accessor: (row) => row.acquisitionType },
+              {
+                id: "cost",
+                header: "Cost",
+                accessor: (row) => row.costType,
+                cell: (row) =>
+                  row.costType === "free" ? (
+                    <Badge tone="default">Free</Badge>
+                  ) : (
+                    <span className="text-slate-700">Paid</span>
+                  ),
+              },
               { id: "scope", header: "Scope", accessor: (row) => row.scope },
-              { id: "cost", header: "Cost Type", accessor: (row) => row.costType },
               {
                 id: "price",
                 header: "Price",
                 accessor: (row) => row.price ?? 0,
                 numeric: true,
-                cell: (row) => (row.price ? formatCurrencyIDR(row.price) : "-"),
+                cell: (row) => (row.price !== null ? formatCurrencyIDR(row.price) : "-"),
               },
               { id: "count", header: "Count", accessor: (row) => row.count, numeric: true },
               { id: "duration", header: "Duration", accessor: (row) => row.duration ?? 0, numeric: true, cell: (row) => row.duration ?? "-" },
+              {
+                id: "subtotal",
+                header: "Subtotal",
+                accessor: (row) =>
+                  calculateLogisticSubtotal({
+                    costType: row.costType,
+                    acquisitionType: row.acquisitionType,
+                    price: row.price,
+                    count: row.count,
+                    duration: row.duration,
+                  }),
+                numeric: true,
+                className: "font-semibold text-slate-900",
+                cell: (row) => {
+                  const subtotal = calculateLogisticSubtotal({
+                    costType: row.costType,
+                    acquisitionType: row.acquisitionType,
+                    price: row.price,
+                    count: row.count,
+                    duration: row.duration,
+                  });
+
+                  if (row.costType === "free") {
+                    return (
+                      <div className="flex items-center justify-end gap-2">
+                        <span>{formatCurrencyIDR(subtotal)}</span>
+                        <Badge tone="default">Free</Badge>
+                      </div>
+                    );
+                  }
+
+                  return formatCurrencyIDR(subtotal);
+                },
+              },
               {
                 id: "actions",
                 header: "Actions",
@@ -703,11 +780,24 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                 header: "Item",
                 accessor: (row) =>
                   consumptionItems.find((item) => item.id === row.consumptionItemId)?.title ?? "-",
-                cell: (row) => (
-                  <span className="font-medium text-slate-900">
-                    {consumptionItems.find((item) => item.id === row.consumptionItemId)?.title ?? "-"}
-                  </span>
-                ),
+                cell: (row) => {
+                  const subtotal = calculateConsumptionSubtotal({ price: row.price, count: row.count });
+
+                  return (
+                    <div className="min-w-0">
+                      <span className="font-medium text-slate-900">
+                        {consumptionItems.find((item) => item.id === row.consumptionItemId)?.title ?? "-"}
+                      </span>
+                      <div className="mt-1 space-y-0.5 text-xs text-slate-500 md:hidden">
+                        <p>Harga: {formatCurrencyIDR(row.price)}</p>
+                        <p>Jumlah: {row.count}</p>
+                        <p className="font-semibold text-slate-800">
+                          Subtotal: {formatCurrencyIDR(subtotal)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                },
               },
               { id: "time", header: "Time", accessor: (row) => row.time },
               { id: "scope", header: "Scope", accessor: (row) => row.scope },
@@ -719,6 +809,17 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                 cell: (row) => formatCurrencyIDR(row.price),
               },
               { id: "count", header: "Count", accessor: (row) => row.count, numeric: true },
+              {
+                id: "subtotal",
+                header: "Subtotal",
+                accessor: (row) => calculateConsumptionSubtotal({ price: row.price, count: row.count }),
+                numeric: true,
+                className: "font-semibold text-slate-900",
+                cell: (row) =>
+                  formatCurrencyIDR(
+                    calculateConsumptionSubtotal({ price: row.price, count: row.count }),
+                  ),
+              },
               {
                 id: "actions",
                 header: "Actions",
@@ -777,11 +878,24 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                 header: "Item",
                 accessor: (row) =>
                   accommodationItems.find((item) => item.id === row.accommodationItemId)?.title ?? "-",
-                cell: (row) => (
-                  <span className="font-medium text-slate-900">
-                    {accommodationItems.find((item) => item.id === row.accommodationItemId)?.title ?? "-"}
-                  </span>
-                ),
+                cell: (row) => {
+                  const subtotal = calculateAccommodationSubtotal({ price: row.price, count: row.count });
+
+                  return (
+                    <div className="min-w-0">
+                      <span className="font-medium text-slate-900">
+                        {accommodationItems.find((item) => item.id === row.accommodationItemId)?.title ?? "-"}
+                      </span>
+                      <div className="mt-1 space-y-0.5 text-xs text-slate-500 md:hidden">
+                        <p>Harga: {formatCurrencyIDR(row.price)}</p>
+                        <p>Jumlah: {row.count}</p>
+                        <p className="font-semibold text-slate-800">
+                          Subtotal: {formatCurrencyIDR(subtotal)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                },
               },
               { id: "scope", header: "Scope", accessor: (row) => row.scope },
               {
@@ -792,6 +906,18 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                 cell: (row) => formatCurrencyIDR(row.price),
               },
               { id: "count", header: "Count", accessor: (row) => row.count, numeric: true },
+              {
+                id: "subtotal",
+                header: "Subtotal",
+                accessor: (row) =>
+                  calculateAccommodationSubtotal({ price: row.price, count: row.count }),
+                numeric: true,
+                className: "font-semibold text-slate-900",
+                cell: (row) =>
+                  formatCurrencyIDR(
+                    calculateAccommodationSubtotal({ price: row.price, count: row.count }),
+                  ),
+              },
               {
                 id: "actions",
                 header: "Actions",
