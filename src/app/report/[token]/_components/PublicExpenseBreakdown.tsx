@@ -102,7 +102,7 @@ function ExpenseList({
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
-          <p className="text-sm text-slate-500">Belum ada data.</p>
+          <p className="text-sm text-slate-500">Belum ada item.</p>
         ) : (
           <Accordion multiple>
             {rows.map((row) => (
