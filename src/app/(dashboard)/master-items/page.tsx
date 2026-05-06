@@ -58,7 +58,7 @@ export default function MasterItemsPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5 overflow-x-hidden">
       <PageHeader
         title="Master Items"
         description="Kelola master item logistics, consumptions, dan accommodations"

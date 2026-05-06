@@ -52,7 +52,7 @@ export default function TripsPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5 overflow-x-hidden">
       <PageHeader
         title="Trips"
         description="Kelola daftar trip dan masuk ke detail budgeting per trip"

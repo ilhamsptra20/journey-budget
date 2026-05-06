@@ -4,12 +4,18 @@ import { cn } from "@/ui/utils/cn";
 
 export function TableContainer({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("overflow-hidden rounded-lg border border-slate-200 bg-white", className)} {...props} />
+    <div
+      className={cn(
+        "w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200 bg-white",
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
 export function Table({ className, ...props }: TableHTMLAttributes<HTMLTableElement>) {
-  return <table className={cn("min-w-full text-left text-sm", className)} {...props} />;
+  return <table className={cn("w-full min-w-full text-left text-sm", className)} {...props} />;
 }
 
 export function THead({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {

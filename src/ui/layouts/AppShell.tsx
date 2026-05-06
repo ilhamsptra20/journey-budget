@@ -39,49 +39,55 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="flex">
+    <div className="h-screen w-screen overflow-hidden bg-slate-50 text-slate-900">
+      <div className="relative flex h-full w-full overflow-hidden">
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-30 w-64 border-r border-slate-200 bg-white transition-transform lg:translate-x-0",
+            "fixed inset-y-0 left-0 z-40 w-64 border-r border-slate-200 bg-white transition-transform lg:translate-x-0",
             mobileOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >
-          <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
-            <h1 className="text-base font-semibold">Trip Budgeting</h1>
-            <button className="rounded-md p-1 text-slate-500 lg:hidden" onClick={() => setMobileOpen(false)}>
-              <XMarkIcon className="h-5 w-5" />
-            </button>
-          </div>
-          <nav className="space-y-1 p-3">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
+              <h1 className="truncate text-base font-semibold">Trip Budgeting</h1>
+              <button
+                type="button"
+                className="rounded-md p-1 text-slate-500 lg:hidden"
+                onClick={() => setMobileOpen(false)}
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-slate-100 text-slate-900"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                  )}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <Icon className="h-5 w-5" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      active
+                        ? "bg-slate-100 text-slate-900"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                    )}
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
         </aside>
 
-        <div className="flex min-h-screen flex-1 flex-col lg:pl-64">
-          <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
-            <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-              <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden lg:pl-64">
+          <header className="sticky top-0 z-30 w-full shrink-0 border-b border-slate-200 bg-white/95 backdrop-blur">
+            <div className="flex h-16 min-w-0 items-center justify-between px-4 sm:px-6">
+              <div className="flex min-w-0 items-center gap-3">
                 <button
                   type="button"
                   className="rounded-md p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
@@ -89,12 +95,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <Bars3Icon className="h-5 w-5" />
                 </button>
-                <p className="text-sm text-slate-500">Enterprise Console</p>
+                <p className="truncate text-sm text-slate-500">Enterprise Console</p>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <p className="text-sm font-medium text-slate-800">{user?.name ?? "-"}</p>
-                  <p className="text-xs capitalize text-slate-500">{user?.role ?? "guest"}</p>
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                <div className="hidden min-w-0 text-right sm:block">
+                  <p className="truncate text-sm font-medium text-slate-800">{user?.name ?? "-"}</p>
+                  <p className="truncate text-xs capitalize text-slate-500">{user?.role ?? "guest"}</p>
                 </div>
                 <Button variant="secondary" size="sm" onClick={handleLogout}>
                   Logout
@@ -103,14 +109,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
+          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="min-w-0 px-4 py-5 sm:px-6 sm:py-6">{children}</div>
+          </main>
         </div>
       </div>
 
       {mobileOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-20 bg-slate-900/25 lg:hidden"
+          className="fixed inset-0 z-30 bg-slate-900/25 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       ) : null}

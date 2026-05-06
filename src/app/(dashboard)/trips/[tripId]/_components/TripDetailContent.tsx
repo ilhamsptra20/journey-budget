@@ -367,7 +367,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   }, [trip?.publicReportEnabled, publicShareLink]);
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5 overflow-x-hidden">
       <PageHeader
         title={trip ? `Trip: ${trip.title}` : "Trip Detail"}
         description={
@@ -390,7 +390,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
 
       {!loading && activeTab === "overview" ? (
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Total Expense" value={formatCurrencyIDR(summary?.expenses.total ?? 0)} />
             <StatCard label="Total Kolektif" value={formatCurrencyIDR(summary?.funds.kolektif ?? 0)} />
             <StatCard label="Total Donatur" value={formatCurrencyIDR(summary?.funds.donatur ?? 0)} />
@@ -818,7 +818,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
 
       {!loading && activeTab === "summary" ? (
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Total Biaya" value={formatCurrencyIDR(summary?.expenses.total ?? 0)} />
             <StatCard label="Total Donatur" value={formatCurrencyIDR(summary?.funds.donatur ?? 0)} />
             <StatCard label="Total Kolektif" value={formatCurrencyIDR(summary?.funds.kolektif ?? 0)} />
@@ -1037,8 +1037,8 @@ function ExpenseSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="min-w-0 space-y-4">
+      <div className="flex min-w-0 items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-slate-900">{title}</h2>
         {canEdit ? (
           <Button onClick={onAdd}>
@@ -1915,7 +1915,7 @@ function FundTable({
   onDelete: (row: FundRow) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <h2 className="text-base font-semibold text-slate-900">{title}</h2>
       <DataTable
         data={rows}

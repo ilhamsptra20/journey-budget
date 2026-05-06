@@ -18,7 +18,7 @@ export function DashboardOverview() {
   const { loading, error, stats } = useDashboardData();
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5 overflow-x-hidden">
       <PageHeader
         title="Dashboard"
         description="Snapshot ringkas operasional Trip Budgeting"
@@ -26,7 +26,7 @@ export function DashboardOverview() {
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Trips" value={String(stats.totalTrips)} icon={<MapPinIcon className="h-5 w-5" />} />
         <StatCard label="Active Trips" value={String(stats.activeTrips)} icon={<ChartBarIcon className="h-5 w-5" />} />
         <StatCard label="Total Members" value={String(stats.totalMembers)} icon={<UsersIcon className="h-5 w-5" />} />

@@ -16,7 +16,7 @@ type TabsProps = {
 
 export function Tabs({ items, value, onChange, className }: TabsProps) {
   return (
-    <div className={cn("overflow-x-auto", className)}>
+    <div className={cn("w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden", className)}>
       <div className="flex min-w-max gap-2 pb-1">
         {items.map((tab) => (
           <TabButton

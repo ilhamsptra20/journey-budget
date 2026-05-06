@@ -19,7 +19,7 @@ export function DashboardGate({ children }: { children: React.ReactNode }) {
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex h-screen w-screen items-center justify-center overflow-hidden bg-slate-50">
         <Spinner className="h-6 w-6" />
       </div>
     );

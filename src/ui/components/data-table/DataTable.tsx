@@ -52,7 +52,7 @@ export function DataTable<T>({
   pageSizeOptions = DEFAULT_PAGE_SIZES,
   defaultPageSize = 10,
   stickyHeader = true,
-  minTableWidthClassName = "min-w-[760px]",
+  minTableWidthClassName = "min-w-full",
   className,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -117,7 +117,7 @@ export function DataTable<T>({
   };
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("w-full min-w-0 max-w-full space-y-3", className)}>
       {searchEnabled ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="w-full max-w-sm">
@@ -151,9 +151,9 @@ export function DataTable<T>({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-        <div className="overflow-x-auto">
-          <table className={cn("w-full border-separate border-spacing-0", minTableWidthClassName)}>
+      <div className="w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="w-full min-w-0 overflow-x-auto">
+          <table className={cn("w-full min-w-full border-separate border-spacing-0", minTableWidthClassName)}>
             <thead className="bg-slate-50">
               <tr>
                 {columns.map((column) => (

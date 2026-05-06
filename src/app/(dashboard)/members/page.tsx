@@ -40,7 +40,7 @@ export default function MembersPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5 overflow-x-hidden">
       <PageHeader
         title="Members"
         description="Kelola daftar anggota untuk kebutuhan trip"
