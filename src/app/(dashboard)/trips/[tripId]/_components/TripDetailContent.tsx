@@ -33,6 +33,13 @@ import {
 } from "@/ui/components";
 import { useAuth } from "@/ui/providers/AuthProvider";
 import { formatCurrencyIDR, formatDate } from "@/ui/utils/format";
+import {
+  confirmAction,
+  confirmDelete,
+  showError,
+  showSuccess,
+  showWarning,
+} from "@/ui/utils/swal";
 import { mapValidationErrors } from "@/ui/utils/validation";
 
 import {
@@ -201,9 +208,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   } = useTripDetail(tripId);
 
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
-  const [actionError, setActionError] = useState("");
   const [publicShareLink, setPublicShareLink] = useState("");
-  const [publicShareNotice, setPublicShareNotice] = useState("");
   const [publicShareLoading, setPublicShareLoading] = useState(false);
 
   const [openMemberModal, setOpenMemberModal] = useState(false);
@@ -258,8 +263,6 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   };
 
   const handleEnablePublicReport = async (copyAfterEnable = false) => {
-    setActionError("");
-    setPublicShareNotice("");
     setPublicShareLoading(true);
 
     try {
@@ -269,24 +272,35 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
 
       if (copyAfterEnable && link) {
         const copied = await copyTextToClipboard(link);
-        setPublicShareNotice(copied ? "Link report berhasil disalin." : "Link report siap dibagikan.");
+        if (copied) {
+          await showSuccess("Link berhasil disalin");
+        } else {
+          await showSuccess("Public report berhasil diaktifkan");
+          await showWarning("Link belum bisa disalin otomatis. Silakan salin manual.");
+        }
       } else {
-        setPublicShareNotice("Public report berhasil diaktifkan.");
+        await showSuccess("Public report berhasil diaktifkan");
       }
     } catch (caughtError) {
-      if (caughtError instanceof ApiClientError) {
-        setActionError(caughtError.message);
-      } else {
-        setActionError(caughtError instanceof Error ? caughtError.message : "Gagal mengaktifkan public report");
-      }
+      await showError(
+        caughtError instanceof Error ? caughtError.message : "Gagal mengaktifkan public report",
+      );
     } finally {
       setPublicShareLoading(false);
     }
   };
 
   const handleRegeneratePublicReport = async () => {
-    setActionError("");
-    setPublicShareNotice("");
+    const confirmed = await confirmAction({
+      title: "Regenerate token?",
+      text: "Link lama tidak akan valid lagi setelah token diperbarui.",
+      confirmButtonText: "Ya, regenerate",
+      cancelButtonText: "Batal",
+    });
+    if (!confirmed) {
+      return;
+    }
+
     setPublicShareLoading(true);
 
     try {
@@ -294,37 +308,39 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
       const link = result.share_link ?? "";
       setPublicShareLink(link);
       const copied = link ? await copyTextToClipboard(link) : false;
-      setPublicShareNotice(
-        copied
-          ? "Token berhasil diperbarui dan link baru disalin."
-          : "Token berhasil diperbarui. Bagikan link baru.",
-      );
-    } catch (caughtError) {
-      if (caughtError instanceof ApiClientError) {
-        setActionError(caughtError.message);
+      if (copied) {
+        await showSuccess("Token berhasil diperbarui dan link baru disalin");
       } else {
-        setActionError(caughtError instanceof Error ? caughtError.message : "Gagal memperbarui token");
+        await showSuccess("Token berhasil diperbarui");
       }
+    } catch (caughtError) {
+      await showError(caughtError instanceof Error ? caughtError.message : "Gagal memperbarui token");
     } finally {
       setPublicShareLoading(false);
     }
   };
 
   const handleDisablePublicReport = async () => {
-    setActionError("");
-    setPublicShareNotice("");
+    const confirmed = await confirmAction({
+      title: "Nonaktifkan public report?",
+      text: "Link report publik tidak bisa diakses setelah dinonaktifkan.",
+      confirmButtonText: "Ya, nonaktifkan",
+      cancelButtonText: "Batal",
+    });
+    if (!confirmed) {
+      return;
+    }
+
     setPublicShareLoading(true);
 
     try {
       await disablePublicReport();
       setPublicShareLink("");
-      setPublicShareNotice("Public report dinonaktifkan.");
+      await showSuccess("Public report berhasil dinonaktifkan");
     } catch (caughtError) {
-      if (caughtError instanceof ApiClientError) {
-        setActionError(caughtError.message);
-      } else {
-        setActionError(caughtError instanceof Error ? caughtError.message : "Gagal menonaktifkan public report");
-      }
+      await showError(
+        caughtError instanceof Error ? caughtError.message : "Gagal menonaktifkan public report",
+      );
     } finally {
       setPublicShareLoading(false);
     }
@@ -333,7 +349,11 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   const handleCopyPublicReportLink = async () => {
     if (publicShareLink) {
       const copied = await copyTextToClipboard(publicShareLink);
-      setPublicShareNotice(copied ? "Link report berhasil disalin." : "Link report siap dibagikan.");
+      if (copied) {
+        await showSuccess("Link berhasil disalin");
+      } else {
+        await showWarning("Link belum bisa disalin otomatis. Silakan salin manual.");
+      }
       return;
     }
 
@@ -341,21 +361,19 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   };
 
   const handleDelete = async (label: string, action: () => Promise<unknown>) => {
-    const confirmed = window.confirm(`Hapus ${label}?`);
+    const confirmed = await confirmDelete({
+      title: "Hapus data?",
+      text: `Data ${label} yang dihapus tidak bisa dikembalikan.`,
+    });
     if (!confirmed) {
       return;
     }
 
-    setActionError("");
-
     try {
       await action();
+      await showSuccess("Data berhasil dihapus");
     } catch (caughtError) {
-      if (caughtError instanceof ApiClientError) {
-        setActionError(caughtError.message);
-      } else {
-        setActionError(caughtError instanceof Error ? caughtError.message : "Aksi gagal");
-      }
+      await showError(caughtError instanceof Error ? caughtError.message : "Aksi gagal");
     }
   };
 
@@ -378,7 +396,6 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
 
       <Tabs items={tabItems} value={activeTab} onChange={(key) => setActiveTab(key as TabKey)} />
 
@@ -491,7 +508,6 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                   </div>
                 ) : null}
 
-                {publicShareNotice ? <Alert tone="success">{publicShareNotice}</Alert> : null}
               </div>
             ) : (
               <div className="mt-4">
@@ -889,12 +905,12 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
           try {
             await addTripMember(memberId);
             setOpenMemberModal(false);
+            await showSuccess("Data berhasil ditambahkan");
           } catch (caughtError) {
-            if (caughtError instanceof ApiClientError) {
-              setActionError(caughtError.message);
-            } else {
-              setActionError("Gagal menambah anggota trip");
-            }
+            await showError(
+              caughtError instanceof Error ? caughtError.message : "Gagal menambah anggota trip",
+            );
+            throw caughtError;
           }
         }}
       />
@@ -918,17 +934,34 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
           setEditingLogistic(null);
         }}
         onCreateMasterItem={async (keyword) => {
-          const created = await createLogisticMasterItem(keyword);
-          return toOption(created.id, created.title, created);
+          try {
+            const created = await createLogisticMasterItem(keyword);
+            await showSuccess("Data berhasil ditambahkan");
+            return toOption(created.id, created.title, created);
+          } catch (caughtError) {
+            await showError(
+              caughtError instanceof Error ? caughtError.message : "Gagal menambah master item logistik",
+            );
+            throw caughtError;
+          }
         }}
         onSubmit={async (payload, participantIds) => {
-          if (editingLogistic) {
-            await updateTripLogistic(editingLogistic.id, payload, participantIds);
-          } else {
-            await createTripLogistic(payload as TripLogisticPayload, participantIds);
+          try {
+            if (editingLogistic) {
+              await updateTripLogistic(editingLogistic.id, payload, participantIds);
+              await showSuccess("Data berhasil diperbarui");
+            } else {
+              await createTripLogistic(payload as TripLogisticPayload, participantIds);
+              await showSuccess("Data berhasil ditambahkan");
+            }
+            setOpenLogisticModal(false);
+            setEditingLogistic(null);
+          } catch (caughtError) {
+            await showError(
+              caughtError instanceof Error ? caughtError.message : "Gagal menyimpan logistic expense",
+            );
+            throw caughtError;
           }
-          setOpenLogisticModal(false);
-          setEditingLogistic(null);
         }}
       />
 
@@ -951,17 +984,34 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
           setEditingConsumption(null);
         }}
         onCreateMasterItem={async (keyword) => {
-          const created = await createConsumptionMasterItem(keyword);
-          return toOption(created.id, created.title, created);
+          try {
+            const created = await createConsumptionMasterItem(keyword);
+            await showSuccess("Data berhasil ditambahkan");
+            return toOption(created.id, created.title, created);
+          } catch (caughtError) {
+            await showError(
+              caughtError instanceof Error ? caughtError.message : "Gagal menambah master item konsumsi",
+            );
+            throw caughtError;
+          }
         }}
         onSubmit={async (payload, participantIds) => {
-          if (editingConsumption) {
-            await updateTripConsumption(editingConsumption.id, payload, participantIds);
-          } else {
-            await createTripConsumption(payload as TripConsumptionPayload, participantIds);
+          try {
+            if (editingConsumption) {
+              await updateTripConsumption(editingConsumption.id, payload, participantIds);
+              await showSuccess("Data berhasil diperbarui");
+            } else {
+              await createTripConsumption(payload as TripConsumptionPayload, participantIds);
+              await showSuccess("Data berhasil ditambahkan");
+            }
+            setOpenConsumptionModal(false);
+            setEditingConsumption(null);
+          } catch (caughtError) {
+            await showError(
+              caughtError instanceof Error ? caughtError.message : "Gagal menyimpan consumption expense",
+            );
+            throw caughtError;
           }
-          setOpenConsumptionModal(false);
-          setEditingConsumption(null);
         }}
       />
 
@@ -984,17 +1034,34 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
           setEditingAccommodation(null);
         }}
         onCreateMasterItem={async (keyword) => {
-          const created = await createAccommodationMasterItem(keyword);
-          return toOption(created.id, created.title, created);
+          try {
+            const created = await createAccommodationMasterItem(keyword);
+            await showSuccess("Data berhasil ditambahkan");
+            return toOption(created.id, created.title, created);
+          } catch (caughtError) {
+            await showError(
+              caughtError instanceof Error ? caughtError.message : "Gagal menambah master item akomodasi",
+            );
+            throw caughtError;
+          }
         }}
         onSubmit={async (payload, participantIds) => {
-          if (editingAccommodation) {
-            await updateTripAccommodation(editingAccommodation.id, payload, participantIds);
-          } else {
-            await createTripAccommodation(payload as TripAccommodationPayload, participantIds);
+          try {
+            if (editingAccommodation) {
+              await updateTripAccommodation(editingAccommodation.id, payload, participantIds);
+              await showSuccess("Data berhasil diperbarui");
+            } else {
+              await createTripAccommodation(payload as TripAccommodationPayload, participantIds);
+              await showSuccess("Data berhasil ditambahkan");
+            }
+            setOpenAccommodationModal(false);
+            setEditingAccommodation(null);
+          } catch (caughtError) {
+            await showError(
+              caughtError instanceof Error ? caughtError.message : "Gagal menyimpan accommodation expense",
+            );
+            throw caughtError;
           }
-          setOpenAccommodationModal(false);
-          setEditingAccommodation(null);
         }}
       />
 
@@ -1007,14 +1074,21 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
           setEditingFund(null);
         }}
         onSubmit={async (payload) => {
-          if (editingFund) {
-            await updateFund(editingFund.id, payload);
-          } else {
-            await createFund(payload as FundPayload);
-          }
+          try {
+            if (editingFund) {
+              await updateFund(editingFund.id, payload);
+              await showSuccess("Data berhasil diperbarui");
+            } else {
+              await createFund(payload as FundPayload);
+              await showSuccess("Data berhasil ditambahkan");
+            }
 
-          setOpenFundModal(false);
-          setEditingFund(null);
+            setOpenFundModal(false);
+            setEditingFund(null);
+          } catch (caughtError) {
+            await showError(caughtError instanceof Error ? caughtError.message : "Gagal menyimpan dana");
+            throw caughtError;
+          }
         }}
       />
     </div>

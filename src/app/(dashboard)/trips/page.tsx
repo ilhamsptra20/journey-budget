@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 
-import { ApiClientError } from "@/ui/api/client";
 import { Alert, Button, PageHeader } from "@/ui/components";
 import { useAuth } from "@/ui/providers/AuthProvider";
+import { confirmDelete, showError, showSuccess } from "@/ui/utils/swal";
 
 import { TripFormModal } from "./_components/TripFormModal";
 import { TripTable } from "./_components/TripTable";
@@ -18,10 +18,14 @@ export default function TripsPage() {
 
   const [openForm, setOpenForm] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
-  const [actionError, setActionError] = useState("");
-
   const handleCreate = async (payload: Record<string, unknown>) => {
-    await createTrip(payload as Parameters<typeof createTrip>[0]);
+    try {
+      await createTrip(payload as Parameters<typeof createTrip>[0]);
+      await showSuccess("Data berhasil ditambahkan");
+    } catch (caughtError) {
+      await showError(caughtError instanceof Error ? caughtError.message : "Gagal menambah trip");
+      throw caughtError;
+    }
   };
 
   const handleUpdate = async (payload: Record<string, unknown>) => {
@@ -29,25 +33,29 @@ export default function TripsPage() {
       return;
     }
 
-    await updateTrip(editingTrip.id, payload as Parameters<typeof updateTrip>[1]);
+    try {
+      await updateTrip(editingTrip.id, payload as Parameters<typeof updateTrip>[1]);
+      await showSuccess("Data berhasil diperbarui");
+    } catch (caughtError) {
+      await showError(caughtError instanceof Error ? caughtError.message : "Gagal memperbarui trip");
+      throw caughtError;
+    }
   };
 
   const handleDelete = async (trip: Trip) => {
-    const confirmed = window.confirm(`Hapus trip \"${trip.title}\"?`);
+    const confirmed = await confirmDelete({
+      title: "Hapus data?",
+      text: `Data trip "${trip.title}" yang dihapus tidak bisa dikembalikan.`,
+    });
     if (!confirmed) {
       return;
     }
 
-    setActionError("");
-
     try {
       await deleteTrip(trip.id);
+      await showSuccess("Data berhasil dihapus");
     } catch (caughtError) {
-      if (caughtError instanceof ApiClientError) {
-        setActionError(caughtError.message);
-      } else {
-        setActionError("Gagal menghapus trip");
-      }
+      await showError(caughtError instanceof Error ? caughtError.message : "Gagal menghapus trip");
     }
   };
 
@@ -71,7 +79,6 @@ export default function TripsPage() {
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
 
       <TripTable
         trips={trips}

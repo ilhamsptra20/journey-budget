@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 
-import { ApiClientError } from "@/ui/api/client";
 import { Alert, Button, PageHeader } from "@/ui/components";
 import { useAuth } from "@/ui/providers/AuthProvider";
+import { confirmDelete, showError, showSuccess } from "@/ui/utils/swal";
 
 import { MemberFormModal } from "./_components/MemberFormModal";
 import { MemberTable } from "./_components/MemberTable";
@@ -18,24 +18,20 @@ export default function MembersPage() {
 
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<Member | null>(null);
-  const [actionError, setActionError] = useState("");
-
   const handleDelete = async (member: Member) => {
-    const confirmed = window.confirm(`Hapus member \"${member.name}\"?`);
+    const confirmed = await confirmDelete({
+      title: "Hapus data?",
+      text: `Data member "${member.name}" yang dihapus tidak bisa dikembalikan.`,
+    });
     if (!confirmed) {
       return;
     }
 
-    setActionError("");
-
     try {
       await deleteMember(member.id);
+      await showSuccess("Data berhasil dihapus");
     } catch (caughtError) {
-      if (caughtError instanceof ApiClientError) {
-        setActionError(caughtError.message);
-      } else {
-        setActionError("Gagal menghapus member");
-      }
+      await showError(caughtError instanceof Error ? caughtError.message : "Gagal menghapus member");
     }
   };
 
@@ -59,7 +55,6 @@ export default function MembersPage() {
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
 
       <MemberTable
         members={members}
@@ -82,11 +77,23 @@ export default function MembersPage() {
         }}
         onSubmit={async (payload) => {
           if (editing) {
-            await updateMember(editing.id, payload);
+            try {
+              await updateMember(editing.id, payload);
+              await showSuccess("Data berhasil diperbarui");
+            } catch (caughtError) {
+              await showError(caughtError instanceof Error ? caughtError.message : "Gagal memperbarui member");
+              throw caughtError;
+            }
             return;
           }
 
-          await createMember(payload);
+          try {
+            await createMember(payload);
+            await showSuccess("Data berhasil ditambahkan");
+          } catch (caughtError) {
+            await showError(caughtError instanceof Error ? caughtError.message : "Gagal menambah member");
+            throw caughtError;
+          }
         }}
       />
     </div>

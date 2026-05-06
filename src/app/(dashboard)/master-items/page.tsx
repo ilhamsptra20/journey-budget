@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 
-import { ApiClientError } from "@/ui/api/client";
 import { Alert, Button, PageHeader, Tabs } from "@/ui/components";
 import { useAuth } from "@/ui/providers/AuthProvider";
+import { confirmDelete, showError, showSuccess } from "@/ui/utils/swal";
 
 import { MasterItemFormModal } from "./_components/MasterItemFormModal";
 import { MasterItemTable } from "./_components/MasterItemTable";
@@ -25,8 +25,6 @@ export default function MasterItemsPage() {
   const [tab, setTab] = useState<MasterTab>("logistics");
   const [openForm, setOpenForm] = useState(false);
   const [editing, setEditing] = useState<ItemLike | null>(null);
-  const [actionError, setActionError] = useState("");
-
   const { items, loading, error, createItem, updateItem, deleteItem } = useMasterItems(tab);
 
   const tabItems = useMemo(
@@ -39,21 +37,19 @@ export default function MasterItemsPage() {
   );
 
   const handleDelete = async (item: ItemLike) => {
-    const confirmed = window.confirm(`Hapus item \"${item.title}\"?`);
+    const confirmed = await confirmDelete({
+      title: "Hapus data?",
+      text: `Data item "${item.title}" yang dihapus tidak bisa dikembalikan.`,
+    });
     if (!confirmed) {
       return;
     }
 
-    setActionError("");
-
     try {
       await deleteItem(item.id);
+      await showSuccess("Data berhasil dihapus");
     } catch (caughtError) {
-      if (caughtError instanceof ApiClientError) {
-        setActionError(caughtError.message);
-      } else {
-        setActionError("Gagal menghapus item");
-      }
+      await showError(caughtError instanceof Error ? caughtError.message : "Gagal menghapus item");
     }
   };
 
@@ -79,7 +75,6 @@ export default function MasterItemsPage() {
       <Tabs items={tabItems} value={tab} onChange={(next) => setTab(next as MasterTab)} />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
 
       <MasterItemTable
         tab={tab}
@@ -104,11 +99,23 @@ export default function MasterItemsPage() {
         }}
         onSubmit={async (payload) => {
           if (editing) {
-            await updateItem(editing.id, payload);
+            try {
+              await updateItem(editing.id, payload);
+              await showSuccess("Data berhasil diperbarui");
+            } catch (caughtError) {
+              await showError(caughtError instanceof Error ? caughtError.message : "Gagal memperbarui item");
+              throw caughtError;
+            }
             return;
           }
 
-          await createItem(payload);
+          try {
+            await createItem(payload);
+            await showSuccess("Data berhasil ditambahkan");
+          } catch (caughtError) {
+            await showError(caughtError instanceof Error ? caughtError.message : "Gagal menambah item");
+            throw caughtError;
+          }
         }}
       />
     </div>
