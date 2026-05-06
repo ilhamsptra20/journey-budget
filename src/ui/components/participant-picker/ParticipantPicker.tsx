@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
 import { Badge } from "@/ui/components/Badge";
@@ -38,6 +38,7 @@ export function ParticipantPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const selectAllId = useId();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -57,6 +58,14 @@ export function ParticipantPicker({
   }, []);
 
   const selectedSet = useMemo(() => new Set(value), [value]);
+  const selectableValues = useMemo(() => options.map((option) => option.value), [options]);
+  const isAllSelected = useMemo(() => {
+    if (options.length === 0) {
+      return false;
+    }
+
+    return options.every((option) => selectedSet.has(option.value));
+  }, [options, selectedSet]);
 
   const selectedOptions = useMemo(
     () => options.filter((option) => selectedSet.has(option.value)),
@@ -92,6 +101,15 @@ export function ParticipantPicker({
     onChange(value.filter((id) => id !== memberId));
   };
 
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      onChange(selectableValues);
+      return;
+    }
+
+    onChange([]);
+  };
+
   return (
     <div className="space-y-1.5" ref={containerRef}>
       {label ? <p className="text-sm font-medium text-slate-700">{label}</p> : null}
@@ -103,6 +121,29 @@ export function ParticipantPicker({
           disabled && "cursor-not-allowed bg-slate-50",
         )}
       >
+        <div className="mb-2 rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2">
+          <label
+            htmlFor={selectAllId}
+            className={cn(
+              "flex items-center gap-2 text-sm text-slate-700",
+              disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer",
+            )}
+          >
+            <input
+              id={selectAllId}
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              checked={isAllSelected}
+              disabled={disabled || options.length === 0}
+              onChange={(event) => toggleSelectAll(event.target.checked)}
+            />
+            <span>Pilih semua anggota</span>
+          </label>
+          <p className="mt-1 text-xs text-slate-500">
+            Gunakan jika biaya berlaku untuk semua peserta.
+          </p>
+        </div>
+
         <div className="mb-2 flex flex-wrap gap-2">
           {selectedOptions.length > 0 ? (
             selectedOptions.map((option) => (
