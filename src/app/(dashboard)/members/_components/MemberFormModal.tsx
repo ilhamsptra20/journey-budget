@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { ApiClientError } from "@/ui/api/client";
-import { Alert, Button, Input, Modal, Spinner } from "@/ui/components";
+import { Alert, Button, Input, Modal } from "@/ui/components";
 import { mapValidationErrors } from "@/ui/utils/validation";
 
 import type { Member } from "../_hooks/useMembers";
@@ -65,13 +65,15 @@ export function MemberFormModal({
       open={open}
       onClose={onClose}
       title={mode === "create" ? "Tambah Member" : "Edit Member"}
+      isSubmitting={submitting}
+      disableClose={submitting}
+      loadingText={mode === "create" ? "Menyimpan data..." : "Memperbarui data..."}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" type="button" onClick={onClose}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={submitting}>
             Batal
           </Button>
-          <Button form="member-form" type="submit" isLoading={submitting}>
-            {submitting ? <Spinner /> : null}
+          <Button form="member-form" type="submit" loading={submitting}>
             Simpan
           </Button>
         </div>
@@ -85,6 +87,7 @@ export function MemberFormModal({
           value={name}
           onChange={(event) => setName(event.target.value)}
           error={fieldErrors.name}
+          disabled={submitting}
           required
         />
       </form>

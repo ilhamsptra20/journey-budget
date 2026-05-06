@@ -21,6 +21,7 @@ import {
   EmptyState,
   IconButton,
   Input,
+  LoadingOverlay,
   Modal,
   PageHeader,
   ParticipantPicker,
@@ -210,6 +211,10 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [publicShareLink, setPublicShareLink] = useState("");
   const [publicShareLoading, setPublicShareLoading] = useState(false);
+  const [publicShareLoadingText, setPublicShareLoadingText] = useState("Menyimpan data...");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionLoadingText, setActionLoadingText] = useState("Memproses data...");
+  const isActionLocked = actionLoading || publicShareLoading;
 
   const [openMemberModal, setOpenMemberModal] = useState(false);
   const [openLogisticModal, setOpenLogisticModal] = useState(false);
@@ -263,6 +268,11 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   };
 
   const handleEnablePublicReport = async (copyAfterEnable = false) => {
+    if (publicShareLoading) {
+      return;
+    }
+
+    setPublicShareLoadingText("Menyimpan data...");
     setPublicShareLoading(true);
 
     try {
@@ -291,6 +301,10 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   };
 
   const handleRegeneratePublicReport = async () => {
+    if (publicShareLoading) {
+      return;
+    }
+
     const confirmed = await confirmAction({
       title: "Regenerate token?",
       text: "Link lama tidak akan valid lagi setelah token diperbarui.",
@@ -301,6 +315,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
       return;
     }
 
+    setPublicShareLoadingText("Memperbarui data...");
     setPublicShareLoading(true);
 
     try {
@@ -321,6 +336,10 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   };
 
   const handleDisablePublicReport = async () => {
+    if (publicShareLoading) {
+      return;
+    }
+
     const confirmed = await confirmAction({
       title: "Nonaktifkan public report?",
       text: "Link report publik tidak bisa diakses setelah dinonaktifkan.",
@@ -331,6 +350,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
       return;
     }
 
+    setPublicShareLoadingText("Memperbarui data...");
     setPublicShareLoading(true);
 
     try {
@@ -361,6 +381,10 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   };
 
   const handleDelete = async (label: string, action: () => Promise<unknown>) => {
+    if (actionLoading) {
+      return;
+    }
+
     const confirmed = await confirmDelete({
       title: "Hapus data?",
       text: `Data ${label} yang dihapus tidak bisa dikembalikan.`,
@@ -369,11 +393,16 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
       return;
     }
 
+    setActionLoadingText("Menghapus data...");
+    setActionLoading(true);
+
     try {
       await action();
       await showSuccess("Data berhasil dihapus");
     } catch (caughtError) {
       await showError(caughtError instanceof Error ? caughtError.message : "Aksi gagal");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -385,7 +414,8 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
   }, [trip?.publicReportEnabled, publicShareLink]);
 
   return (
-    <div className="min-w-0 space-y-5 overflow-x-hidden">
+    <div className="relative min-w-0 space-y-5 overflow-x-hidden">
+      <LoadingOverlay show={actionLoading} text={actionLoadingText} />
       <PageHeader
         title={trip ? `Trip: ${trip.title}` : "Trip Detail"}
         description={
@@ -417,7 +447,8 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
             Detail biaya, pendanaan, dan pembagian tagihan tersedia di masing-masing tab.
           </Alert>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="relative rounded-lg border border-slate-200 bg-white p-4">
+            <LoadingOverlay show={publicShareLoading} text={publicShareLoadingText} />
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">Public Report</h2>
@@ -431,9 +462,9 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                   type="checkbox"
                   className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                   checked={Boolean(trip?.publicReportEnabled)}
-                  disabled={!canEdit || publicShareLoading}
+                  disabled={!canEdit || publicShareLoading || actionLoading}
                   onChange={(event) => {
-                    if (!canEdit || publicShareLoading) {
+                    if (!canEdit || publicShareLoading || actionLoading) {
                       return;
                     }
 
@@ -455,8 +486,8 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                     <Button
                       type="button"
                       size="sm"
-                      isLoading={publicShareLoading}
-                      disabled={publicShareLoading}
+                      loading={publicShareLoading}
+                      disabled={publicShareLoading || actionLoading}
                       onClick={() => void handleEnablePublicReport(true)}
                     >
                       <LinkIcon className="h-4 w-4" />
@@ -468,8 +499,8 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                         type="button"
                         size="sm"
                         variant="secondary"
-                        isLoading={publicShareLoading}
-                        disabled={publicShareLoading}
+                        loading={publicShareLoading}
+                        disabled={publicShareLoading || actionLoading}
                         onClick={() => void handleCopyPublicReportLink()}
                       >
                         <ClipboardDocumentIcon className="h-4 w-4" />
@@ -479,8 +510,8 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                         type="button"
                         size="sm"
                         variant="secondary"
-                        isLoading={publicShareLoading}
-                        disabled={publicShareLoading}
+                        loading={publicShareLoading}
+                        disabled={publicShareLoading || actionLoading}
                         onClick={() => void handleRegeneratePublicReport()}
                       >
                         <ArrowPathIcon className="h-4 w-4" />
@@ -490,8 +521,8 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                         type="button"
                         size="sm"
                         variant="danger"
-                        isLoading={publicShareLoading}
-                        disabled={publicShareLoading}
+                        loading={publicShareLoading}
+                        disabled={publicShareLoading || actionLoading}
                         onClick={() => void handleDisablePublicReport()}
                       >
                         <TrashIcon className="h-4 w-4" />
@@ -522,7 +553,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
         <div className="space-y-4">
           {canEdit ? (
             <div className="flex justify-end">
-              <Button onClick={() => setOpenMemberModal(true)}>
+              <Button disabled={isActionLocked} onClick={() => setOpenMemberModal(true)}>
                 <PlusIcon className="h-4 w-4" />
                 Tambah Anggota
               </Button>
@@ -556,6 +587,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                     <div className="flex justify-end">
                       <IconButton
                         tone="danger"
+                        disabled={isActionLocked}
                         onClick={() =>
                           void handleDelete(`anggota ${row.member_name}`, () =>
                             removeTripMember(row.member_id),
@@ -578,6 +610,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
         <ExpenseSection
           title="Trip Logistics"
           canEdit={canEdit}
+          isBusy={isActionLocked}
           onAdd={() => {
             setEditingLogistic(null);
             setOpenLogisticModal(true);
@@ -622,6 +655,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                   canEdit ? (
                     <div className="flex justify-end gap-2">
                       <IconButton
+                        disabled={isActionLocked}
                         onClick={() => {
                           setEditingLogistic(row);
                           setOpenLogisticModal(true);
@@ -631,6 +665,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                       </IconButton>
                       <IconButton
                         tone="danger"
+                        disabled={isActionLocked}
                         onClick={() =>
                           void handleDelete("logistic expense", () => deleteTripLogistic(row.id))
                         }
@@ -651,6 +686,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
         <ExpenseSection
           title="Trip Consumptions"
           canEdit={canEdit}
+          isBusy={isActionLocked}
           onAdd={() => {
             setEditingConsumption(null);
             setOpenConsumptionModal(true);
@@ -693,6 +729,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                   canEdit ? (
                     <div className="flex justify-end gap-2">
                       <IconButton
+                        disabled={isActionLocked}
                         onClick={() => {
                           setEditingConsumption(row);
                           setOpenConsumptionModal(true);
@@ -702,6 +739,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                       </IconButton>
                       <IconButton
                         tone="danger"
+                        disabled={isActionLocked}
                         onClick={() =>
                           void handleDelete("consumption expense", () => deleteTripConsumption(row.id))
                         }
@@ -722,6 +760,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
         <ExpenseSection
           title="Trip Accommodations"
           canEdit={canEdit}
+          isBusy={isActionLocked}
           onAdd={() => {
             setEditingAccommodation(null);
             setOpenAccommodationModal(true);
@@ -763,6 +802,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                   canEdit ? (
                     <div className="flex justify-end gap-2">
                       <IconButton
+                        disabled={isActionLocked}
                         onClick={() => {
                           setEditingAccommodation(row);
                           setOpenAccommodationModal(true);
@@ -772,6 +812,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
                       </IconButton>
                       <IconButton
                         tone="danger"
+                        disabled={isActionLocked}
                         onClick={() =>
                           void handleDelete("accommodation expense", () => deleteTripAccommodation(row.id))
                         }
@@ -793,6 +834,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
           {canEdit ? (
             <div className="flex justify-end">
               <Button
+                disabled={isActionLocked}
                 onClick={() => {
                   setEditingFund(null);
                   setOpenFundModal(true);
@@ -811,6 +853,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
             rows={funds.filter((row) => row.type === "kolektif")}
             memberMap={memberMap}
             canEdit={canEdit}
+            disabled={isActionLocked}
             onEdit={(row) => {
               setEditingFund(row);
               setOpenFundModal(true);
@@ -823,6 +866,7 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
             rows={funds.filter((row) => row.type === "donatur")}
             memberMap={memberMap}
             canEdit={canEdit}
+            disabled={isActionLocked}
             onEdit={(row) => {
               setEditingFund(row);
               setOpenFundModal(true);
@@ -1102,11 +1146,13 @@ function ReadonlyHint() {
 function ExpenseSection({
   title,
   canEdit,
+  isBusy,
   onAdd,
   children,
 }: {
   title: string;
   canEdit: boolean;
+  isBusy?: boolean;
   onAdd: () => void;
   children: React.ReactNode;
 }) {
@@ -1115,7 +1161,7 @@ function ExpenseSection({
       <div className="flex min-w-0 items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-slate-900">{title}</h2>
         {canEdit ? (
-          <Button onClick={onAdd}>
+          <Button disabled={isBusy} onClick={onAdd}>
             <PlusIcon className="h-4 w-4" />
             Add
           </Button>
@@ -1157,15 +1203,18 @@ function AddTripMemberModal({
       open={open}
       onClose={onClose}
       title="Tambah Anggota"
+      isSubmitting={submitting}
+      disableClose={submitting}
+      loadingText="Menyimpan data..."
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" type="button" onClick={onClose}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={submitting}>
             Batal
           </Button>
           <Button
             type="button"
-            isLoading={submitting}
-            disabled={!memberId}
+            loading={submitting}
+            disabled={!memberId || submitting}
             onClick={async () => {
               setError("");
               setSubmitting(true);
@@ -1179,7 +1228,6 @@ function AddTripMemberModal({
               }
             }}
           >
-            {submitting ? <Spinner /> : null}
             Simpan
           </Button>
         </div>
@@ -1193,6 +1241,7 @@ function AddTripMemberModal({
           label="Member"
           value={memberId}
           onChange={(event) => setMemberId(event.target.value)}
+          disabled={submitting}
           options={members.map((member) => ({ value: member.id, label: member.name }))}
           placeholder="Pilih member"
         />
@@ -1291,7 +1340,6 @@ function TripLogisticModal({
   };
 
   const handleSubmit = async () => {
-    setSubmitting(true);
     setError("");
     setFieldErrors({});
 
@@ -1301,31 +1349,26 @@ function TripLogisticModal({
 
     if (!form.item) {
       setFieldErrors({ logistic_item_id: "Pilih item terlebih dahulu" });
-      setSubmitting(false);
       return;
     }
 
     if (!count || count < 1) {
       setFieldErrors({ count: "Count minimal 1" });
-      setSubmitting(false);
       return;
     }
 
     if (isSewa && (!duration || duration < 1)) {
       setFieldErrors({ duration: "Duration wajib diisi saat sewa" });
-      setSubmitting(false);
       return;
     }
 
     if (isPaid && (price === null || price < 0)) {
       setFieldErrors({ price: "Price wajib dan tidak boleh negatif" });
-      setSubmitting(false);
       return;
     }
 
     if (form.scope === "personal" && form.participantIds.length === 0) {
       setFieldErrors({ participants: "Participants wajib untuk scope personal" });
-      setSubmitting(false);
       return;
     }
 
@@ -1338,6 +1381,8 @@ function TripLogisticModal({
       count,
       duration: isSewa ? duration : null,
     };
+
+    setSubmitting(true);
 
     try {
       await onSubmit(payload, form.participantIds);
@@ -1358,13 +1403,15 @@ function TripLogisticModal({
       open={open}
       onClose={onClose}
       title={initialData ? "Edit Logistic Expense" : "Tambah Logistic Expense"}
+      isSubmitting={submitting}
+      disableClose={submitting}
+      loadingText={initialData ? "Memperbarui data..." : "Menyimpan data..."}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" type="button" onClick={onClose}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={submitting}>
             Batal
           </Button>
-          <Button type="button" isLoading={submitting} disabled={submitting} onClick={() => void handleSubmit()}>
-            {submitting ? <Spinner /> : null}
+          <Button type="button" loading={submitting} disabled={submitting} onClick={() => void handleSubmit()}>
             Simpan
           </Button>
         </div>
@@ -1380,6 +1427,7 @@ function TripLogisticModal({
           onChange={handleLogisticItemChange}
           onCreateOption={onCreateMasterItem}
           createText={(keyword) => `Buat item baru: ${keyword}`}
+          disabled={submitting}
           error={fieldErrors.logistic_item_id}
         />
 
@@ -1400,6 +1448,7 @@ function TripLogisticModal({
                 acquisition_type: event.target.value as LogisticFormValues["acquisition_type"],
               }))
             }
+            disabled={submitting}
             options={[
               { value: "beli", label: "beli" },
               { value: "sewa", label: "sewa" },
@@ -1416,6 +1465,7 @@ function TripLogisticModal({
                 scope: event.target.value as LogisticFormValues["scope"],
               }))
             }
+            disabled={submitting}
             options={[
               { value: "group", label: "group" },
               { value: "personal", label: "personal" },
@@ -1433,6 +1483,7 @@ function TripLogisticModal({
                 cost_type: event.target.value as LogisticFormValues["cost_type"],
               }))
             }
+            disabled={submitting}
             options={[
               { value: "paid", label: "paid" },
               { value: "free", label: "free" },
@@ -1442,7 +1493,7 @@ function TripLogisticModal({
             label="Price"
             type="number"
             min={0}
-            disabled={!isPaid}
+            disabled={!isPaid || submitting}
             value={form.price}
             onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
             error={fieldErrors.price}
@@ -1456,6 +1507,7 @@ function TripLogisticModal({
             type="number"
             min={1}
             value={form.count}
+            disabled={submitting}
             onChange={(event) => setForm((prev) => ({ ...prev, count: event.target.value }))}
             error={fieldErrors.count}
           />
@@ -1465,6 +1517,7 @@ function TripLogisticModal({
               type="number"
               min={1}
               value={form.duration}
+              disabled={submitting}
               onChange={(event) => setForm((prev) => ({ ...prev, duration: event.target.value }))}
               error={fieldErrors.duration}
             />
@@ -1476,6 +1529,7 @@ function TripLogisticModal({
           options={memberOptions}
           value={form.participantIds}
           onChange={(participantIds) => setForm((prev) => ({ ...prev, participantIds }))}
+          disabled={submitting}
           error={fieldErrors.participants}
           hint={
             form.scope === "group"
@@ -1567,7 +1621,6 @@ function TripConsumptionModal({
   };
 
   const handleSubmit = async () => {
-    setSubmitting(true);
     setError("");
     setFieldErrors({});
 
@@ -1576,25 +1629,21 @@ function TripConsumptionModal({
 
     if (!form.item) {
       setFieldErrors({ consumption_item_id: "Pilih item terlebih dahulu" });
-      setSubmitting(false);
       return;
     }
 
     if (price === null || price < 0) {
       setFieldErrors({ price: "Price tidak valid" });
-      setSubmitting(false);
       return;
     }
 
     if (!count || count < 1) {
       setFieldErrors({ count: "Count minimal 1" });
-      setSubmitting(false);
       return;
     }
 
     if (form.scope === "personal" && form.participantIds.length === 0) {
       setFieldErrors({ participants: "Participants wajib untuk scope personal" });
-      setSubmitting(false);
       return;
     }
 
@@ -1605,6 +1654,8 @@ function TripConsumptionModal({
       price,
       count,
     };
+
+    setSubmitting(true);
 
     try {
       await onSubmit(payload, form.participantIds);
@@ -1625,13 +1676,15 @@ function TripConsumptionModal({
       open={open}
       onClose={onClose}
       title={initialData ? "Edit Consumption Expense" : "Tambah Consumption Expense"}
+      isSubmitting={submitting}
+      disableClose={submitting}
+      loadingText={initialData ? "Memperbarui data..." : "Menyimpan data..."}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" type="button" onClick={onClose}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={submitting}>
             Batal
           </Button>
-          <Button type="button" isLoading={submitting} disabled={submitting} onClick={() => void handleSubmit()}>
-            {submitting ? <Spinner /> : null}
+          <Button type="button" loading={submitting} disabled={submitting} onClick={() => void handleSubmit()}>
             Simpan
           </Button>
         </div>
@@ -1647,6 +1700,7 @@ function TripConsumptionModal({
           onChange={handleConsumptionItemChange}
           onCreateOption={onCreateMasterItem}
           createText={(keyword) => `Buat item baru: ${keyword}`}
+          disabled={submitting}
           error={fieldErrors.consumption_item_id}
         />
 
@@ -1675,6 +1729,7 @@ function TripConsumptionModal({
                 time: event.target.value as ConsumptionFormValues["time"],
               }))
             }
+            disabled={submitting}
             options={[
               { value: "pagi", label: "pagi" },
               { value: "siang", label: "siang" },
@@ -1694,6 +1749,7 @@ function TripConsumptionModal({
                 scope: event.target.value as ConsumptionFormValues["scope"],
               }))
             }
+            disabled={submitting}
             options={[
               { value: "group", label: "group" },
               { value: "personal", label: "personal" },
@@ -1707,6 +1763,7 @@ function TripConsumptionModal({
             type="number"
             min={0}
             value={form.price}
+            disabled={submitting}
             onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
             error={fieldErrors.price}
             hint={
@@ -1720,6 +1777,7 @@ function TripConsumptionModal({
             type="number"
             min={1}
             value={form.count}
+            disabled={submitting}
             onChange={(event) => setForm((prev) => ({ ...prev, count: event.target.value }))}
             error={fieldErrors.count}
           />
@@ -1729,6 +1787,7 @@ function TripConsumptionModal({
           label="Participants"
           options={memberOptions}
           value={form.participantIds}
+          disabled={submitting}
           onChange={(participantIds) => setForm((prev) => ({ ...prev, participantIds }))}
           error={fieldErrors.participants}
           hint={
@@ -1820,7 +1879,6 @@ function TripAccommodationModal({
   };
 
   const handleSubmit = async () => {
-    setSubmitting(true);
     setError("");
     setFieldErrors({});
 
@@ -1829,25 +1887,21 @@ function TripAccommodationModal({
 
     if (!form.item) {
       setFieldErrors({ accommodation_item_id: "Pilih item terlebih dahulu" });
-      setSubmitting(false);
       return;
     }
 
     if (price === null || price < 0) {
       setFieldErrors({ price: "Price tidak valid" });
-      setSubmitting(false);
       return;
     }
 
     if (!count || count < 1) {
       setFieldErrors({ count: "Count minimal 1" });
-      setSubmitting(false);
       return;
     }
 
     if (form.scope === "personal" && form.participantIds.length === 0) {
       setFieldErrors({ participants: "Participants wajib untuk scope personal" });
-      setSubmitting(false);
       return;
     }
 
@@ -1857,6 +1911,8 @@ function TripAccommodationModal({
       price,
       count,
     };
+
+    setSubmitting(true);
 
     try {
       await onSubmit(payload, form.participantIds);
@@ -1877,13 +1933,15 @@ function TripAccommodationModal({
       open={open}
       onClose={onClose}
       title={initialData ? "Edit Accommodation Expense" : "Tambah Accommodation Expense"}
+      isSubmitting={submitting}
+      disableClose={submitting}
+      loadingText={initialData ? "Memperbarui data..." : "Menyimpan data..."}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" type="button" onClick={onClose}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={submitting}>
             Batal
           </Button>
-          <Button type="button" isLoading={submitting} disabled={submitting} onClick={() => void handleSubmit()}>
-            {submitting ? <Spinner /> : null}
+          <Button type="button" loading={submitting} disabled={submitting} onClick={() => void handleSubmit()}>
             Simpan
           </Button>
         </div>
@@ -1899,6 +1957,7 @@ function TripAccommodationModal({
           onChange={handleAccommodationItemChange}
           onCreateOption={onCreateMasterItem}
           createText={(keyword) => `Buat item baru: ${keyword}`}
+          disabled={submitting}
           error={fieldErrors.accommodation_item_id}
         />
 
@@ -1927,6 +1986,7 @@ function TripAccommodationModal({
                 scope: event.target.value as AccommodationFormValues["scope"],
               }))
             }
+            disabled={submitting}
             options={[
               { value: "group", label: "group" },
               { value: "personal", label: "personal" },
@@ -1937,6 +1997,7 @@ function TripAccommodationModal({
             type="number"
             min={0}
             value={form.price}
+            disabled={submitting}
             onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
             error={fieldErrors.price}
             hint={
@@ -1952,6 +2013,7 @@ function TripAccommodationModal({
           type="number"
           min={1}
           value={form.count}
+          disabled={submitting}
           onChange={(event) => setForm((prev) => ({ ...prev, count: event.target.value }))}
           error={fieldErrors.count}
         />
@@ -1960,6 +2022,7 @@ function TripAccommodationModal({
           label="Participants"
           options={memberOptions}
           value={form.participantIds}
+          disabled={submitting}
           onChange={(participantIds) => setForm((prev) => ({ ...prev, participantIds }))}
           error={fieldErrors.participants}
           hint={
@@ -1978,6 +2041,7 @@ function FundTable({
   rows,
   memberMap,
   canEdit,
+  disabled = false,
   onEdit,
   onDelete,
 }: {
@@ -1985,6 +2049,7 @@ function FundTable({
   rows: FundRow[];
   memberMap: Map<string, string>;
   canEdit: boolean;
+  disabled?: boolean;
   onEdit: (row: FundRow) => void;
   onDelete: (row: FundRow) => void;
 }) {
@@ -2033,10 +2098,10 @@ function FundTable({
             cell: (row) =>
               canEdit ? (
                 <div className="flex justify-end gap-2">
-                  <IconButton onClick={() => onEdit(row)}>
+                  <IconButton disabled={disabled} onClick={() => onEdit(row)}>
                     <PencilSquareIcon className="h-4 w-4" />
                   </IconButton>
-                  <IconButton tone="danger" onClick={() => onDelete(row)}>
+                  <IconButton tone="danger" disabled={disabled} onClick={() => onDelete(row)}>
                     <TrashIcon className="h-4 w-4" />
                   </IconButton>
                 </div>
@@ -2113,27 +2178,25 @@ function FundModal({
   const isKolektif = form.type === "kolektif";
 
   const handleSubmit = async () => {
-    setSubmitting(true);
     setError("");
     setFieldErrors({});
 
     if (form.amount < 0) {
       setFieldErrors({ amount: "Amount tidak boleh negatif" });
-      setSubmitting(false);
       return;
     }
 
     if (isKolektif && !form.member_id) {
       setFieldErrors({ member_id: "Member wajib diisi untuk kolektif" });
-      setSubmitting(false);
       return;
     }
 
     if (!isKolektif && !form.source_name) {
       setFieldErrors({ source_name: "Source name wajib diisi untuk donatur" });
-      setSubmitting(false);
       return;
     }
+
+    setSubmitting(true);
 
     try {
       await onSubmit(form);
@@ -2154,13 +2217,15 @@ function FundModal({
       open={open}
       onClose={onClose}
       title={initialData ? "Edit Dana" : "Tambah Dana"}
+      isSubmitting={submitting}
+      disableClose={submitting}
+      loadingText={initialData ? "Memperbarui data..." : "Menyimpan data..."}
       footer={
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
             Batal
           </Button>
-          <Button type="button" isLoading={submitting} disabled={submitting} onClick={() => void handleSubmit()}>
-            {submitting ? <Spinner /> : null}
+          <Button type="button" loading={submitting} disabled={submitting} onClick={() => void handleSubmit()}>
             Simpan
           </Button>
         </div>
@@ -2180,6 +2245,7 @@ function FundModal({
               source_name: event.target.value === "donatur" ? prev.source_name : null,
             }))
           }
+          disabled={submitting}
           options={[
             { value: "kolektif", label: "kolektif" },
             { value: "donatur", label: "donatur" },
@@ -2196,6 +2262,7 @@ function FundModal({
                 member_id: event.target.value || null,
               }))
             }
+            disabled={submitting}
             options={memberOptions}
             placeholder="Pilih member"
             error={fieldErrors.member_id}
@@ -2210,6 +2277,7 @@ function FundModal({
                 source_name: event.target.value || null,
               }))
             }
+            disabled={submitting}
             error={fieldErrors.source_name}
           />
         )}
@@ -2226,6 +2294,7 @@ function FundModal({
                 amount: Number(event.target.value || "0"),
               }))
             }
+            disabled={submitting}
             error={fieldErrors.amount}
           />
           <Input
@@ -2238,6 +2307,7 @@ function FundModal({
                 paid_at: event.target.value ? new Date(event.target.value).toISOString() : null,
               }))
             }
+            disabled={submitting}
             error={fieldErrors.paid_at}
           />
         </div>
@@ -2246,11 +2316,12 @@ function FundModal({
           label="Method"
           value={form.method ?? ""}
           onChange={(event) =>
-            setForm((prev) => ({
-              ...prev,
-              method: event.target.value || null,
-            }))
-          }
+              setForm((prev) => ({
+                ...prev,
+                method: event.target.value || null,
+              }))
+            }
+          disabled={submitting}
           error={fieldErrors.method}
         />
 
@@ -2258,11 +2329,12 @@ function FundModal({
           label="Note"
           value={form.note ?? ""}
           onChange={(event) =>
-            setForm((prev) => ({
-              ...prev,
-              note: event.target.value || null,
-            }))
-          }
+              setForm((prev) => ({
+                ...prev,
+                note: event.target.value || null,
+              }))
+            }
+          disabled={submitting}
           error={fieldErrors.note}
         />
       </div>

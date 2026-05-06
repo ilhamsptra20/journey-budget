@@ -179,7 +179,7 @@ export function ParticipantPicker({
             disabled={disabled}
           />
 
-          {open ? (
+          {open && !disabled ? (
             <div className="absolute z-30 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-sm">
               {loading ? (
                 <div className="flex items-center gap-2 px-3 py-2 text-sm text-slate-500">
@@ -194,6 +194,7 @@ export function ParticipantPicker({
                     key={option.value}
                     type="button"
                     className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    disabled={disabled}
                     onClick={() => addParticipant(option.value)}
                   >
                     {option.label}

@@ -7,6 +7,7 @@ export * from "./data-table/DataTable";
 export * from "./EmptyState";
 export * from "./IconButton";
 export * from "./Input";
+export * from "./loading-overlay/LoadingOverlay";
 export * from "./Modal";
 export * from "./PageHeader";
 export * from "./participant-picker/ParticipantPicker";

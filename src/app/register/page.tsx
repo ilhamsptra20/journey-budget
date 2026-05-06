@@ -72,6 +72,7 @@ export default function RegisterPage() {
               name="name"
               value={name}
               onChange={(event) => setName(event.target.value)}
+              disabled={submitting}
               error={fieldErrors.name}
               required
             />
@@ -81,6 +82,7 @@ export default function RegisterPage() {
               name="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              disabled={submitting}
               error={fieldErrors.email}
               required
             />
@@ -90,6 +92,7 @@ export default function RegisterPage() {
               name="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              disabled={submitting}
               error={fieldErrors.password}
               required
             />
@@ -97,14 +100,14 @@ export default function RegisterPage() {
               label="Role"
               name="role"
               value={role}
+              disabled={submitting}
               onChange={(event) => setRole(event.target.value as "user" | "guest")}
               options={[
                 { label: "User", value: "user" },
                 { label: "Guest (read-only)", value: "guest" },
               ]}
             />
-            <Button className="w-full" isLoading={submitting} type="submit">
-              {submitting ? <Spinner /> : null}
+            <Button className="w-full" loading={submitting} type="submit" disabled={submitting}>
               Register
             </Button>
           </form>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ApiClientError } from "@/ui/api/client";
-import { Alert, Button, Input, Modal, Select, Spinner } from "@/ui/components";
+import { Alert, Button, Input, Modal, Select } from "@/ui/components";
 import { mapValidationErrors } from "@/ui/utils/validation";
 
 import { MasterItemPayload, MasterTab } from "../_hooks/useMasterItems";
@@ -117,13 +117,15 @@ export function MasterItemFormModal({
       open={open}
       onClose={onClose}
       title={modalTitle}
+      isSubmitting={submitting}
+      disableClose={submitting}
+      loadingText={mode === "create" ? "Menyimpan data..." : "Memperbarui data..."}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" type="button" onClick={onClose}>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={submitting}>
             Batal
           </Button>
-          <Button form="master-item-form" type="submit" isLoading={submitting}>
-            {submitting ? <Spinner /> : null}
+          <Button form="master-item-form" type="submit" loading={submitting}>
             Simpan
           </Button>
         </div>
@@ -138,6 +140,7 @@ export function MasterItemFormModal({
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           error={fieldErrors.title}
+          disabled={submitting}
           required
         />
 
@@ -150,6 +153,7 @@ export function MasterItemFormModal({
             options={categoryOptions[tab]}
             placeholder="Pilih category"
             error={fieldErrors.category}
+            disabled={submitting}
             required
           />
         ) : null}
@@ -161,6 +165,7 @@ export function MasterItemFormModal({
             value={unit}
             onChange={(event) => setUnit(event.target.value)}
             error={fieldErrors.unit}
+            disabled={submitting}
             required
           />
           <Input
@@ -171,6 +176,7 @@ export function MasterItemFormModal({
             value={defaultPrice}
             onChange={(event) => setDefaultPrice(event.target.value)}
             error={fieldErrors.default_price}
+            disabled={submitting}
             placeholder="Optional"
           />
         </div>

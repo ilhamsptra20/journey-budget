@@ -1,5 +1,6 @@
 import { ButtonHTMLAttributes, forwardRef } from "react";
 
+import { Spinner } from "@/ui/components/Spinner";
 import { cn } from "@/ui/utils/cn";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
@@ -9,6 +10,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
   isLoading?: boolean;
+  loading?: boolean;
 };
 
 const variantStyles: Record<ButtonVariant, string> = {
@@ -34,11 +36,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       variant = "primary",
       size = "md",
       isLoading = false,
+      loading,
       disabled,
       ...props
     },
     ref,
   ) => {
+    const resolvedLoading = loading ?? isLoading;
+
     return (
       <button
         ref={ref}
@@ -48,9 +53,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           sizeStyles[size],
           className,
         )}
-        disabled={disabled || isLoading}
+        disabled={disabled || resolvedLoading}
+        aria-busy={resolvedLoading}
         {...props}
       >
+        {resolvedLoading ? <Spinner className="h-4 w-4 border-current/30 border-t-current" /> : null}
         {children}
       </button>
     );

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { ApiClientError } from "@/ui/api/client";
-import { Alert, Button, Input, Modal, Spinner } from "@/ui/components";
+import { Alert, Button, Input, Modal } from "@/ui/components";
 import { mapValidationErrors } from "@/ui/utils/validation";
 
 import type { Trip, TripPayload } from "../_hooks/useTrips";
@@ -30,6 +30,7 @@ export function TripFormModal({
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const loadingText = mode === "create" ? "Menyimpan data..." : "Memperbarui data...";
 
   useEffect(() => {
     if (!open) {
@@ -79,13 +80,15 @@ export function TripFormModal({
       open={open}
       onClose={onClose}
       title={mode === "create" ? "Buat Trip" : "Edit Trip"}
+      isSubmitting={submitting}
+      disableClose={submitting}
+      loadingText={loadingText}
       footer={
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
             Batal
           </Button>
-          <Button type="submit" form="trip-form" isLoading={submitting}>
-            {submitting ? <Spinner /> : null}
+          <Button type="submit" form="trip-form" loading={submitting}>
             Simpan
           </Button>
         </div>
@@ -99,6 +102,7 @@ export function TripFormModal({
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           error={fieldErrors.title}
+          disabled={submitting}
           required
         />
         <Input
@@ -107,6 +111,7 @@ export function TripFormModal({
           value={location}
           onChange={(event) => setLocation(event.target.value)}
           error={fieldErrors.location}
+          disabled={submitting}
           required
         />
         <div className="grid gap-4 sm:grid-cols-2">
@@ -117,6 +122,7 @@ export function TripFormModal({
             value={startDate}
             onChange={(event) => setStartDate(event.target.value)}
             error={fieldErrors.start_date}
+            disabled={submitting}
             required
           />
           <Input
@@ -126,6 +132,7 @@ export function TripFormModal({
             value={endDate}
             onChange={(event) => setEndDate(event.target.value)}
             error={fieldErrors.end_date}
+            disabled={submitting}
           />
         </div>
       </form>

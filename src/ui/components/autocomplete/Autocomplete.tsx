@@ -217,7 +217,7 @@ export function Autocomplete({
             disabled={disabled || creating}
           />
           {loading || creating ? <Spinner className="h-4 w-4" /> : null}
-          {clearable && value ? (
+          {clearable && value && !disabled ? (
             <button
               type="button"
               className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
@@ -233,7 +233,7 @@ export function Autocomplete({
           <ChevronDownIcon className="h-4 w-4 text-slate-400" />
         </div>
 
-        {open ? (
+        {open && !disabled ? (
           <div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-sm">
             {filteredOptions.map((option, index) => {
               const active = highlightIndex === index;
@@ -247,6 +247,7 @@ export function Autocomplete({
                     "flex w-full items-center justify-between px-3 py-2 text-left text-sm text-slate-700",
                     active ? "bg-slate-100" : "hover:bg-slate-50",
                   )}
+                  disabled={creating}
                   onMouseEnter={() => setHighlightIndex(index)}
                   onClick={() => handleSelect(option)}
                 >
@@ -263,6 +264,7 @@ export function Autocomplete({
                   "flex w-full items-center justify-between px-3 py-2 text-left text-sm text-emerald-700",
                   highlightIndex === filteredOptions.length ? "bg-emerald-50" : "hover:bg-emerald-50",
                 )}
+                disabled={creating}
                 onMouseEnter={() => setHighlightIndex(filteredOptions.length)}
                 onClick={() => {
                   void handleCreate();

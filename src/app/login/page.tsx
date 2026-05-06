@@ -70,6 +70,7 @@ export default function LoginPage() {
               name="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              disabled={submitting}
               error={fieldErrors.email}
               placeholder="you@company.com"
               required
@@ -80,11 +81,11 @@ export default function LoginPage() {
               name="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              disabled={submitting}
               error={fieldErrors.password}
               required
             />
-            <Button className="w-full" isLoading={submitting} type="submit">
-              {submitting ? <Spinner /> : null}
+            <Button className="w-full" loading={submitting} type="submit" disabled={submitting}>
               Login
             </Button>
           </form>
