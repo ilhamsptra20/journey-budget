@@ -1,4 +1,5 @@
 export * from "./Alert";
+export * from "./accordion/Accordion";
 export * from "./autocomplete/Autocomplete";
 export * from "./Badge";
 export * from "./Button";

@@ -12,6 +12,10 @@ import {
 
 import { ApiClientError } from "@/ui/api/client";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
   Alert,
   Autocomplete,
   AutocompleteOption,
@@ -700,188 +704,90 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
           }}
         >
           <SectionSubtotal label="Total Logistik" value={logisticsTotal} />
-          <DataTable
-            data={tripLogistics}
-            rowKey={(row) => row.id}
-            searchPlaceholder="Cari expense logistics..."
+          <ExpenseAccordionList
+            rows={tripLogistics.map((row) => {
+              const itemTitle = logisticItems.find((item) => item.id === row.logisticItemId)?.title ?? "-";
+              const participantsMeta = getExpenseParticipantsMeta(
+                "trip_logistics",
+                row.id,
+                row.scope,
+              );
+              const subtotal = calculateLogisticSubtotal({
+                costType: row.costType,
+                acquisitionType: row.acquisitionType,
+                scope: row.scope,
+                price: row.price,
+                count: row.count,
+                duration: row.duration,
+                participantsCount: participantsMeta.participantsCount,
+              });
+              const isFree = row.costType === "free";
+              const participantsText =
+                participantsMeta.participantsCount > 0
+                  ? participantsMeta.isAllMembers
+                    ? "Semua anggota"
+                    : `${participantsMeta.participantsCount} peserta`
+                  : "-";
+              const share = isFree
+                ? 0
+                : calculateParticipantShare(subtotal, participantsMeta.participantsCount);
+
+              return {
+                id: row.id,
+                title: itemTitle,
+                summary: `${row.acquisitionType} • ${row.scope} • ${participantsText}`,
+                subtotal,
+                isFree,
+                badges: [
+                  { label: row.acquisitionType },
+                  { label: row.scope },
+                  ...(isFree ? [{ label: "Gratis", tone: "default" as const }] : []),
+                ],
+                details: [
+                  {
+                    label: "Harga",
+                    value: row.price !== null ? formatCurrencyIDR(row.price) : "-",
+                  },
+                  { label: "Jumlah", value: String(row.count) },
+                  ...(row.acquisitionType === "sewa"
+                    ? [{ label: "Durasi", value: `${row.duration ?? 0} hari` }]
+                    : []),
+                  { label: "Peserta", value: participantsText },
+                  ...(!isFree && participantsMeta.participantsCount > 0
+                    ? [{ label: "Per Orang", value: `${formatCurrencyIDR(share)}/orang` }]
+                    : []),
+                  {
+                    label: "Subtotal",
+                    value: formatCurrencyIDR(subtotal),
+                    highlight: true,
+                  },
+                ],
+                actions: canEdit ? (
+                  <div className="flex justify-end gap-2">
+                    <IconButton
+                      disabled={isActionLocked}
+                      onClick={() => {
+                        setEditingLogistic(row);
+                        setOpenLogisticModal(true);
+                      }}
+                    >
+                      <PencilSquareIcon className="h-4 w-4" />
+                    </IconButton>
+                    <IconButton
+                      tone="danger"
+                      disabled={isActionLocked}
+                      onClick={() =>
+                        void handleDelete("logistic expense", () => deleteTripLogistic(row.id))
+                      }
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </IconButton>
+                  </div>
+                ) : null,
+              };
+            })}
             emptyTitle="Belum ada logistic expense"
-            columns={[
-              {
-                id: "item",
-                header: "Item",
-                accessor: (row) =>
-                  logisticItems.find((item) => item.id === row.logisticItemId)?.title ?? "-",
-                cell: (row) => {
-                  const participantsMeta = getExpenseParticipantsMeta(
-                    "trip_logistics",
-                    row.id,
-                    row.scope,
-                  );
-                  const subtotal = calculateLogisticSubtotal({
-                    costType: row.costType,
-                    acquisitionType: row.acquisitionType,
-                    scope: row.scope,
-                    price: row.price,
-                    count: row.count,
-                    duration: row.duration,
-                    participantsCount: participantsMeta.participantsCount,
-                  });
-                  const isFree = row.costType === "free";
-                  const share = isFree
-                    ? 0
-                    : calculateParticipantShare(subtotal, participantsMeta.participantsCount);
-                  const participantsText =
-                    participantsMeta.isAllMembers
-                      ? "Semua anggota"
-                      : `${participantsMeta.participantsCount} peserta`;
-
-                  return (
-                    <div className="min-w-0">
-                      <span className="font-medium text-slate-900">
-                        {logisticItems.find((item) => item.id === row.logisticItemId)?.title ?? "-"}
-                      </span>
-                      <div className="mt-1 space-y-0.5 text-xs text-slate-500 md:hidden">
-                        <p>Harga: {row.price !== null ? formatCurrencyIDR(row.price) : "-"}</p>
-                        <p>
-                          Jumlah: {row.count}
-                          {row.acquisitionType === "sewa" ? ` • Durasi: ${row.duration ?? "-"}` : ""}
-                        </p>
-                        <p className="font-semibold text-slate-800">
-                          Subtotal: {formatCurrencyIDR(subtotal)}
-                          {isFree ? (
-                            <Badge className="ml-2 align-middle" tone="default">
-                              Free
-                            </Badge>
-                          ) : null}
-                        </p>
-                        {!isFree && participantsMeta.participantsCount > 0 ? (
-                          <p>
-                            {participantsText} • {formatCurrencyIDR(share)}/orang
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                },
-              },
-              { id: "acquisition", header: "Acquisition", accessor: (row) => row.acquisitionType },
-              {
-                id: "cost",
-                header: "Cost",
-                accessor: (row) => row.costType,
-                cell: (row) =>
-                  row.costType === "free" ? (
-                    <Badge tone="default">Free</Badge>
-                  ) : (
-                    <span className="text-slate-700">Paid</span>
-                  ),
-              },
-              { id: "scope", header: "Scope", accessor: (row) => row.scope },
-              {
-                id: "price",
-                header: "Price",
-                accessor: (row) => row.price ?? 0,
-                numeric: true,
-                cell: (row) => (row.price !== null ? formatCurrencyIDR(row.price) : "-"),
-              },
-              { id: "count", header: "Count", accessor: (row) => row.count, numeric: true },
-              { id: "duration", header: "Duration", accessor: (row) => row.duration ?? 0, numeric: true, cell: (row) => row.duration ?? "-" },
-              {
-                id: "subtotal",
-                header: "Subtotal",
-                accessor: (row) =>
-                  calculateLogisticSubtotal({
-                    costType: row.costType,
-                    acquisitionType: row.acquisitionType,
-                    scope: row.scope,
-                    price: row.price,
-                    count: row.count,
-                    duration: row.duration,
-                    participantsCount: calculateExpenseParticipantsCount({
-                      scope: row.scope,
-                      participantsCount: getExpenseParticipantsMemberIds("trip_logistics", row.id).length,
-                      tripMembersCount: tripMembers.length,
-                    }),
-                  }),
-                numeric: true,
-                className: "font-semibold text-slate-900",
-                cell: (row) => {
-                  const participantsMeta = getExpenseParticipantsMeta(
-                    "trip_logistics",
-                    row.id,
-                    row.scope,
-                  );
-                  const subtotal = calculateLogisticSubtotal({
-                    costType: row.costType,
-                    acquisitionType: row.acquisitionType,
-                    scope: row.scope,
-                    price: row.price,
-                    count: row.count,
-                    duration: row.duration,
-                    participantsCount: participantsMeta.participantsCount,
-                  });
-                  const share = row.costType === "free"
-                    ? 0
-                    : calculateParticipantShare(subtotal, participantsMeta.participantsCount);
-                  const participantsText =
-                    participantsMeta.isAllMembers
-                      ? "Semua anggota"
-                      : `${participantsMeta.participantsCount} peserta`;
-
-                  if (row.costType === "free") {
-                    return (
-                      <div className="flex items-center justify-end gap-2">
-                        <span>{formatCurrencyIDR(subtotal)}</span>
-                        <Badge tone="default">Free</Badge>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div>
-                      <p>{formatCurrencyIDR(subtotal)}</p>
-                      {participantsMeta.participantsCount > 0 ? (
-                        <p className="mt-0.5 text-xs font-normal text-slate-500">
-                          {participantsText} • {formatCurrencyIDR(share)}/orang
-                        </p>
-                      ) : null}
-                    </div>
-                  );
-                },
-              },
-              {
-                id: "actions",
-                header: "Actions",
-                searchable: false,
-                align: "right",
-                className: "w-28",
-                cell: (row) =>
-                  canEdit ? (
-                    <div className="flex justify-end gap-2">
-                      <IconButton
-                        disabled={isActionLocked}
-                        onClick={() => {
-                          setEditingLogistic(row);
-                          setOpenLogisticModal(true);
-                        }}
-                      >
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </IconButton>
-                      <IconButton
-                        tone="danger"
-                        disabled={isActionLocked}
-                        onClick={() =>
-                          void handleDelete("logistic expense", () => deleteTripLogistic(row.id))
-                        }
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </IconButton>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-slate-500">Read only</span>
-                  ),
-              },
-            ]}
+            emptyDescription="Tambahkan item logistic expense untuk trip ini."
           />
         </ExpenseSection>
       ) : null}
@@ -897,145 +803,77 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
           }}
         >
           <SectionSubtotal label="Total Konsumsi" value={consumptionsTotal} />
-          <DataTable
-            data={tripConsumptions}
-            rowKey={(row) => row.id}
-            searchPlaceholder="Cari expense konsumsi..."
+          <ExpenseAccordionList
+            rows={tripConsumptions.map((row) => {
+              const item = consumptionItems.find((masterItem) => masterItem.id === row.consumptionItemId);
+              const participantsMeta = getExpenseParticipantsMeta(
+                "trip_consumptions",
+                row.id,
+                row.scope,
+              );
+              const subtotal = calculateConsumptionSubtotal({
+                scope: row.scope,
+                price: row.price,
+                count: row.count,
+                participantsCount: participantsMeta.participantsCount,
+              });
+              const participantsText =
+                participantsMeta.participantsCount > 0
+                  ? participantsMeta.isAllMembers
+                    ? "Semua anggota"
+                    : `${participantsMeta.participantsCount} peserta`
+                  : "-";
+              const share = calculateParticipantShare(subtotal, participantsMeta.participantsCount);
+
+              return {
+                id: row.id,
+                title: item?.title ?? "-",
+                summary: `${item?.category ?? "other"} • ${row.scope} • ${participantsText}`,
+                subtotal,
+                badges: [
+                  { label: item?.category ?? "other" },
+                  { label: row.scope },
+                  { label: row.time },
+                ],
+                details: [
+                  { label: "Harga", value: formatCurrencyIDR(row.price) },
+                  { label: "Jumlah", value: String(row.count) },
+                  { label: "Peserta", value: participantsText },
+                  ...(participantsMeta.participantsCount > 0
+                    ? [{ label: "Per Orang", value: `${formatCurrencyIDR(share)}/orang` }]
+                    : []),
+                  {
+                    label: "Subtotal",
+                    value: formatCurrencyIDR(subtotal),
+                    highlight: true,
+                  },
+                ],
+                actions: canEdit ? (
+                  <div className="flex justify-end gap-2">
+                    <IconButton
+                      disabled={isActionLocked}
+                      onClick={() => {
+                        setEditingConsumption(row);
+                        setOpenConsumptionModal(true);
+                      }}
+                    >
+                      <PencilSquareIcon className="h-4 w-4" />
+                    </IconButton>
+                    <IconButton
+                      tone="danger"
+                      disabled={isActionLocked}
+                      onClick={() =>
+                        void handleDelete("consumption expense", () => deleteTripConsumption(row.id))
+                      }
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </IconButton>
+                  </div>
+                ) : null,
+              };
+            })}
             emptyTitle="Belum ada consumption expense"
-            columns={[
-              {
-                id: "item",
-                header: "Item",
-                accessor: (row) =>
-                  consumptionItems.find((item) => item.id === row.consumptionItemId)?.title ?? "-",
-                cell: (row) => {
-                  const participantsMeta = getExpenseParticipantsMeta(
-                    "trip_consumptions",
-                    row.id,
-                    row.scope,
-                  );
-                  const subtotal = calculateConsumptionSubtotal({
-                    scope: row.scope,
-                    price: row.price,
-                    count: row.count,
-                    participantsCount: participantsMeta.participantsCount,
-                  });
-                  const share = calculateParticipantShare(subtotal, participantsMeta.participantsCount);
-                  const participantsText =
-                    participantsMeta.isAllMembers
-                      ? "Semua anggota"
-                      : `${participantsMeta.participantsCount} peserta`;
-
-                  return (
-                    <div className="min-w-0">
-                      <span className="font-medium text-slate-900">
-                        {consumptionItems.find((item) => item.id === row.consumptionItemId)?.title ?? "-"}
-                      </span>
-                      <div className="mt-1 space-y-0.5 text-xs text-slate-500 md:hidden">
-                        <p>Harga: {formatCurrencyIDR(row.price)}</p>
-                        <p>Jumlah: {row.count}</p>
-                        <p className="font-semibold text-slate-800">
-                          Subtotal: {formatCurrencyIDR(subtotal)}
-                        </p>
-                        {participantsMeta.participantsCount > 0 ? (
-                          <p>
-                            {participantsText} • {formatCurrencyIDR(share)}/orang
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                },
-              },
-              { id: "time", header: "Time", accessor: (row) => row.time },
-              { id: "scope", header: "Scope", accessor: (row) => row.scope },
-              {
-                id: "price",
-                header: "Price",
-                accessor: (row) => row.price,
-                numeric: true,
-                cell: (row) => formatCurrencyIDR(row.price),
-              },
-              { id: "count", header: "Count", accessor: (row) => row.count, numeric: true },
-              {
-                id: "subtotal",
-                header: "Subtotal",
-                accessor: (row) =>
-                  calculateConsumptionSubtotal({
-                    scope: row.scope,
-                    price: row.price,
-                    count: row.count,
-                    participantsCount: calculateExpenseParticipantsCount({
-                      scope: row.scope,
-                      participantsCount: getExpenseParticipantsMemberIds("trip_consumptions", row.id).length,
-                      tripMembersCount: tripMembers.length,
-                    }),
-                  }),
-                numeric: true,
-                className: "font-semibold text-slate-900",
-                cell: (row) => {
-                  const participantsMeta = getExpenseParticipantsMeta(
-                    "trip_consumptions",
-                    row.id,
-                    row.scope,
-                  );
-                  const subtotal = calculateConsumptionSubtotal({
-                    scope: row.scope,
-                    price: row.price,
-                    count: row.count,
-                    participantsCount: participantsMeta.participantsCount,
-                  });
-                  const share = calculateParticipantShare(subtotal, participantsMeta.participantsCount);
-                  const participantsText =
-                    participantsMeta.isAllMembers
-                      ? "Semua anggota"
-                      : `${participantsMeta.participantsCount} peserta`;
-
-                  return (
-                    <div>
-                      <p>{formatCurrencyIDR(subtotal)}</p>
-                      {participantsMeta.participantsCount > 0 ? (
-                        <p className="mt-0.5 text-xs font-normal text-slate-500">
-                          {participantsText} • {formatCurrencyIDR(share)}/orang
-                        </p>
-                      ) : null}
-                    </div>
-                  );
-                },
-              },
-              {
-                id: "actions",
-                header: "Actions",
-                searchable: false,
-                align: "right",
-                className: "w-28",
-                cell: (row) =>
-                  canEdit ? (
-                    <div className="flex justify-end gap-2">
-                      <IconButton
-                        disabled={isActionLocked}
-                        onClick={() => {
-                          setEditingConsumption(row);
-                          setOpenConsumptionModal(true);
-                        }}
-                      >
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </IconButton>
-                      <IconButton
-                        tone="danger"
-                        disabled={isActionLocked}
-                        onClick={() =>
-                          void handleDelete("consumption expense", () => deleteTripConsumption(row.id))
-                        }
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </IconButton>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-slate-500">Read only</span>
-                  ),
-              },
-            ]}
+            emptyDescription="Tambahkan item consumption expense untuk trip ini."
           />
         </ExpenseSection>
       ) : null}
@@ -1051,144 +889,75 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
           }}
         >
           <SectionSubtotal label="Total Akomodasi" value={accommodationsTotal} />
-          <DataTable
-            data={tripAccommodations}
-            rowKey={(row) => row.id}
-            searchPlaceholder="Cari expense akomodasi..."
+          <ExpenseAccordionList
+            rows={tripAccommodations.map((row) => {
+              const item = accommodationItems.find(
+                (masterItem) => masterItem.id === row.accommodationItemId,
+              );
+              const participantsMeta = getExpenseParticipantsMeta(
+                "trip_accommodations",
+                row.id,
+                row.scope,
+              );
+              const subtotal = calculateAccommodationSubtotal({
+                scope: row.scope,
+                price: row.price,
+                count: row.count,
+                participantsCount: participantsMeta.participantsCount,
+              });
+              const participantsText =
+                participantsMeta.participantsCount > 0
+                  ? participantsMeta.isAllMembers
+                    ? "Semua anggota"
+                    : `${participantsMeta.participantsCount} peserta`
+                  : "-";
+              const share = calculateParticipantShare(subtotal, participantsMeta.participantsCount);
+
+              return {
+                id: row.id,
+                title: item?.title ?? "-",
+                summary: `${item?.category ?? "other"} • ${row.scope} • ${participantsText}`,
+                subtotal,
+                badges: [{ label: item?.category ?? "other" }, { label: row.scope }],
+                details: [
+                  { label: "Harga", value: formatCurrencyIDR(row.price) },
+                  { label: "Jumlah", value: String(row.count) },
+                  { label: "Peserta", value: participantsText },
+                  ...(participantsMeta.participantsCount > 0
+                    ? [{ label: "Per Orang", value: `${formatCurrencyIDR(share)}/orang` }]
+                    : []),
+                  {
+                    label: "Subtotal",
+                    value: formatCurrencyIDR(subtotal),
+                    highlight: true,
+                  },
+                ],
+                actions: canEdit ? (
+                  <div className="flex justify-end gap-2">
+                    <IconButton
+                      disabled={isActionLocked}
+                      onClick={() => {
+                        setEditingAccommodation(row);
+                        setOpenAccommodationModal(true);
+                      }}
+                    >
+                      <PencilSquareIcon className="h-4 w-4" />
+                    </IconButton>
+                    <IconButton
+                      tone="danger"
+                      disabled={isActionLocked}
+                      onClick={() =>
+                        void handleDelete("accommodation expense", () => deleteTripAccommodation(row.id))
+                      }
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </IconButton>
+                  </div>
+                ) : null,
+              };
+            })}
             emptyTitle="Belum ada accommodation expense"
-            columns={[
-              {
-                id: "item",
-                header: "Item",
-                accessor: (row) =>
-                  accommodationItems.find((item) => item.id === row.accommodationItemId)?.title ?? "-",
-                cell: (row) => {
-                  const participantsMeta = getExpenseParticipantsMeta(
-                    "trip_accommodations",
-                    row.id,
-                    row.scope,
-                  );
-                  const subtotal = calculateAccommodationSubtotal({
-                    scope: row.scope,
-                    price: row.price,
-                    count: row.count,
-                    participantsCount: participantsMeta.participantsCount,
-                  });
-                  const share = calculateParticipantShare(subtotal, participantsMeta.participantsCount);
-                  const participantsText =
-                    participantsMeta.isAllMembers
-                      ? "Semua anggota"
-                      : `${participantsMeta.participantsCount} peserta`;
-
-                  return (
-                    <div className="min-w-0">
-                      <span className="font-medium text-slate-900">
-                        {accommodationItems.find((item) => item.id === row.accommodationItemId)?.title ?? "-"}
-                      </span>
-                      <div className="mt-1 space-y-0.5 text-xs text-slate-500 md:hidden">
-                        <p>Harga: {formatCurrencyIDR(row.price)}</p>
-                        <p>Jumlah: {row.count}</p>
-                        <p className="font-semibold text-slate-800">
-                          Subtotal: {formatCurrencyIDR(subtotal)}
-                        </p>
-                        {participantsMeta.participantsCount > 0 ? (
-                          <p>
-                            {participantsText} • {formatCurrencyIDR(share)}/orang
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                },
-              },
-              { id: "scope", header: "Scope", accessor: (row) => row.scope },
-              {
-                id: "price",
-                header: "Price",
-                accessor: (row) => row.price,
-                numeric: true,
-                cell: (row) => formatCurrencyIDR(row.price),
-              },
-              { id: "count", header: "Count", accessor: (row) => row.count, numeric: true },
-              {
-                id: "subtotal",
-                header: "Subtotal",
-                accessor: (row) =>
-                  calculateAccommodationSubtotal({
-                    scope: row.scope,
-                    price: row.price,
-                    count: row.count,
-                    participantsCount: calculateExpenseParticipantsCount({
-                      scope: row.scope,
-                      participantsCount: getExpenseParticipantsMemberIds("trip_accommodations", row.id).length,
-                      tripMembersCount: tripMembers.length,
-                    }),
-                  }),
-                numeric: true,
-                className: "font-semibold text-slate-900",
-                cell: (row) => {
-                  const participantsMeta = getExpenseParticipantsMeta(
-                    "trip_accommodations",
-                    row.id,
-                    row.scope,
-                  );
-                  const subtotal = calculateAccommodationSubtotal({
-                    scope: row.scope,
-                    price: row.price,
-                    count: row.count,
-                    participantsCount: participantsMeta.participantsCount,
-                  });
-                  const share = calculateParticipantShare(subtotal, participantsMeta.participantsCount);
-                  const participantsText =
-                    participantsMeta.isAllMembers
-                      ? "Semua anggota"
-                      : `${participantsMeta.participantsCount} peserta`;
-
-                  return (
-                    <div>
-                      <p>{formatCurrencyIDR(subtotal)}</p>
-                      {participantsMeta.participantsCount > 0 ? (
-                        <p className="mt-0.5 text-xs font-normal text-slate-500">
-                          {participantsText} • {formatCurrencyIDR(share)}/orang
-                        </p>
-                      ) : null}
-                    </div>
-                  );
-                },
-              },
-              {
-                id: "actions",
-                header: "Actions",
-                searchable: false,
-                align: "right",
-                className: "w-28",
-                cell: (row) =>
-                  canEdit ? (
-                    <div className="flex justify-end gap-2">
-                      <IconButton
-                        disabled={isActionLocked}
-                        onClick={() => {
-                          setEditingAccommodation(row);
-                          setOpenAccommodationModal(true);
-                        }}
-                      >
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </IconButton>
-                      <IconButton
-                        tone="danger"
-                        disabled={isActionLocked}
-                        onClick={() =>
-                          void handleDelete("accommodation expense", () => deleteTripAccommodation(row.id))
-                        }
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </IconButton>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-slate-500">Read only</span>
-                  ),
-              },
-            ]}
+            emptyDescription="Tambahkan item accommodation expense untuk trip ini."
           />
         </ExpenseSection>
       ) : null}
@@ -1544,6 +1313,91 @@ function SectionSubtotal({ label, value }: { label: string; value: number }) {
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-1 text-sm font-semibold text-slate-900">{formatCurrencyIDR(value)}</p>
     </div>
+  );
+}
+
+type ExpenseAccordionBadgeTone = "default" | "success" | "warning" | "danger";
+
+type ExpenseAccordionRow = {
+  id: string;
+  title: string;
+  summary: string;
+  subtotal: number;
+  isFree?: boolean;
+  badges?: Array<{ label: string; tone?: ExpenseAccordionBadgeTone }>;
+  details: Array<{ label: string; value: React.ReactNode; highlight?: boolean }>;
+  actions?: React.ReactNode;
+};
+
+function ExpenseAccordionList({
+  rows,
+  emptyTitle,
+  emptyDescription,
+}: {
+  rows: ExpenseAccordionRow[];
+  emptyTitle: string;
+  emptyDescription: string;
+}) {
+  if (rows.length === 0) {
+    return <EmptyState title={emptyTitle} description={emptyDescription} />;
+  }
+
+  return (
+    <Accordion multiple>
+      {rows.map((row) => (
+        <AccordionItem key={row.id} value={row.id}>
+          <AccordionTrigger className="px-4 py-3">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">{row.title}</p>
+                {row.badges && row.badges.length > 0 ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {row.badges.map((badge, index) => (
+                      <Badge
+                        key={`${row.id}-badge-${badge.label}-${index}`}
+                        tone={badge.tone ?? "default"}
+                        className="px-2 py-0.5 text-[11px]"
+                      >
+                        {badge.label}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="mt-1 text-xs text-slate-500">{row.summary}</p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Subtotal</p>
+                <div className="mt-1 flex items-center justify-end gap-2">
+                  <p className="text-sm font-semibold text-slate-900">{formatCurrencyIDR(row.subtotal)}</p>
+                  {row.isFree ? <Badge className="px-2 py-0.5 text-[11px]">Gratis</Badge> : null}
+                </div>
+              </div>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                {row.details.map((detail, index) => (
+                  <div key={`${row.id}-detail-${detail.label}-${index}`} className="contents">
+                    <p className="text-xs text-slate-500">{detail.label}</p>
+                    <p
+                      className={
+                        detail.highlight
+                          ? "text-right text-sm font-semibold text-slate-900"
+                          : "text-right text-sm text-slate-700"
+                      }
+                    >
+                      {detail.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {row.actions ? <div className="mt-3 border-t border-slate-100 pt-3">{row.actions}</div> : null}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      ))}
+    </Accordion>
   );
 }
 
