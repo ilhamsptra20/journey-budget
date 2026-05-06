@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { PencilSquareIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowPathIcon,
+  ClipboardDocumentIcon,
+  LinkIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
 
 import { ApiClientError } from "@/ui/api/client";
 import {
@@ -187,11 +194,17 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
     createFund,
     updateFund,
     deleteFund,
+    enablePublicReport,
+    regeneratePublicReport,
+    disablePublicReport,
     getExpenseParticipantsMemberIds,
   } = useTripDetail(tripId);
 
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [actionError, setActionError] = useState("");
+  const [publicShareLink, setPublicShareLink] = useState("");
+  const [publicShareNotice, setPublicShareNotice] = useState("");
+  const [publicShareLoading, setPublicShareLoading] = useState(false);
 
   const [openMemberModal, setOpenMemberModal] = useState(false);
   const [openLogisticModal, setOpenLogisticModal] = useState(false);
@@ -231,7 +244,103 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
     [accommodationItems],
   );
 
-  const handleDelete = async (label: string, action: () => Promise<void>) => {
+  const copyTextToClipboard = async (text: string) => {
+    if (!text || typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+      return false;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleEnablePublicReport = async (copyAfterEnable = false) => {
+    setActionError("");
+    setPublicShareNotice("");
+    setPublicShareLoading(true);
+
+    try {
+      const result = await enablePublicReport();
+      const link = result.share_link ?? "";
+      setPublicShareLink(link);
+
+      if (copyAfterEnable && link) {
+        const copied = await copyTextToClipboard(link);
+        setPublicShareNotice(copied ? "Link report berhasil disalin." : "Link report siap dibagikan.");
+      } else {
+        setPublicShareNotice("Public report berhasil diaktifkan.");
+      }
+    } catch (caughtError) {
+      if (caughtError instanceof ApiClientError) {
+        setActionError(caughtError.message);
+      } else {
+        setActionError(caughtError instanceof Error ? caughtError.message : "Gagal mengaktifkan public report");
+      }
+    } finally {
+      setPublicShareLoading(false);
+    }
+  };
+
+  const handleRegeneratePublicReport = async () => {
+    setActionError("");
+    setPublicShareNotice("");
+    setPublicShareLoading(true);
+
+    try {
+      const result = await regeneratePublicReport();
+      const link = result.share_link ?? "";
+      setPublicShareLink(link);
+      const copied = link ? await copyTextToClipboard(link) : false;
+      setPublicShareNotice(
+        copied
+          ? "Token berhasil diperbarui dan link baru disalin."
+          : "Token berhasil diperbarui. Bagikan link baru.",
+      );
+    } catch (caughtError) {
+      if (caughtError instanceof ApiClientError) {
+        setActionError(caughtError.message);
+      } else {
+        setActionError(caughtError instanceof Error ? caughtError.message : "Gagal memperbarui token");
+      }
+    } finally {
+      setPublicShareLoading(false);
+    }
+  };
+
+  const handleDisablePublicReport = async () => {
+    setActionError("");
+    setPublicShareNotice("");
+    setPublicShareLoading(true);
+
+    try {
+      await disablePublicReport();
+      setPublicShareLink("");
+      setPublicShareNotice("Public report dinonaktifkan.");
+    } catch (caughtError) {
+      if (caughtError instanceof ApiClientError) {
+        setActionError(caughtError.message);
+      } else {
+        setActionError(caughtError instanceof Error ? caughtError.message : "Gagal menonaktifkan public report");
+      }
+    } finally {
+      setPublicShareLoading(false);
+    }
+  };
+
+  const handleCopyPublicReportLink = async () => {
+    if (publicShareLink) {
+      const copied = await copyTextToClipboard(publicShareLink);
+      setPublicShareNotice(copied ? "Link report berhasil disalin." : "Link report siap dibagikan.");
+      return;
+    }
+
+    await handleEnablePublicReport(true);
+  };
+
+  const handleDelete = async (label: string, action: () => Promise<unknown>) => {
     const confirmed = window.confirm(`Hapus ${label}?`);
     if (!confirmed) {
       return;
@@ -249,6 +358,13 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
       }
     }
   };
+
+  useEffect(() => {
+    if (!trip?.publicReportEnabled && publicShareLink) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPublicShareLink("");
+    }
+  }, [trip?.publicReportEnabled, publicShareLink]);
 
   return (
     <div className="space-y-5">
@@ -283,6 +399,106 @@ export function TripDetailContent({ tripId }: TripDetailContentProps) {
           <Alert tone="info">
             Detail biaya, pendanaan, dan pembagian tagihan tersedia di masing-masing tab.
           </Alert>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Public Report</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Bagikan ringkasan trip read-only tanpa login menggunakan link token.
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <span>Public Report</span>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  checked={Boolean(trip?.publicReportEnabled)}
+                  disabled={!canEdit || publicShareLoading}
+                  onChange={(event) => {
+                    if (!canEdit || publicShareLoading) {
+                      return;
+                    }
+
+                    if (event.target.checked) {
+                      void handleEnablePublicReport(false);
+                      return;
+                    }
+
+                    void handleDisablePublicReport();
+                  }}
+                />
+              </label>
+            </div>
+
+            {canEdit ? (
+              <div className="mt-4 space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {!trip?.publicReportEnabled ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      isLoading={publicShareLoading}
+                      disabled={publicShareLoading}
+                      onClick={() => void handleEnablePublicReport(true)}
+                    >
+                      <LinkIcon className="h-4 w-4" />
+                      Generate Share Link
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        isLoading={publicShareLoading}
+                        disabled={publicShareLoading}
+                        onClick={() => void handleCopyPublicReportLink()}
+                      >
+                        <ClipboardDocumentIcon className="h-4 w-4" />
+                        Copy Link
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        isLoading={publicShareLoading}
+                        disabled={publicShareLoading}
+                        onClick={() => void handleRegeneratePublicReport()}
+                      >
+                        <ArrowPathIcon className="h-4 w-4" />
+                        Regenerate Token
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="danger"
+                        isLoading={publicShareLoading}
+                        disabled={publicShareLoading}
+                        onClick={() => void handleDisablePublicReport()}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                        Disable Public Report
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                {publicShareLink ? (
+                  <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-xs text-slate-500">Share Link</p>
+                    <p className="mt-1 break-all text-sm text-slate-800">{publicShareLink}</p>
+                  </div>
+                ) : null}
+
+                {publicShareNotice ? <Alert tone="success">{publicShareNotice}</Alert> : null}
+              </div>
+            ) : (
+              <div className="mt-4">
+                <ReadonlyHint />
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
 

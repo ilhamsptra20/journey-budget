@@ -11,6 +11,24 @@ type ExpenseRow = {
 
 const toMoney = (value: number) => Number(value.toFixed(2));
 
+function calculateLogisticAmount(row: {
+  acquisitionType: "beli" | "sewa" | "bawa_sendiri" | "pinjam";
+  costType: "paid" | "free";
+  price: number | null;
+  count: number;
+  duration: number | null;
+}) {
+  if (row.costType === "free") {
+    return 0;
+  }
+
+  if (row.acquisitionType === "sewa") {
+    return (row.price ?? 0) * row.count * (row.duration ?? 0);
+  }
+
+  return (row.price ?? 0) * row.count;
+}
+
 function buildParticipantMap(
   rows: Array<{ expense_type: string; expense_id: string; member_id: string }>,
 ) {
@@ -65,17 +83,7 @@ class SummaryService {
 
     const membersCount = tripMembers.length;
 
-    const logisticTotal = logistics.reduce((total, row) => {
-      if (row.costType === "free") {
-        return total;
-      }
-
-      if (row.acquisitionType === "sewa") {
-        return total + (row.price ?? 0) * row.count * (row.duration ?? 0);
-      }
-
-      return total + (row.price ?? 0) * row.count;
-    }, 0);
+    const logisticTotal = logistics.reduce((total, row) => total + calculateLogisticAmount(row), 0);
 
     const consumptionTotal = consumptions.reduce((total, row) => {
       return total + row.price * row.count;
@@ -107,12 +115,7 @@ class SummaryService {
       ...logistics.map((row) => ({
         type: "trip_logistics" as const,
         id: row.id,
-        amount:
-          row.costType === "free"
-            ? 0
-            : row.acquisitionType === "sewa"
-              ? (row.price ?? 0) * row.count * (row.duration ?? 0)
-              : (row.price ?? 0) * row.count,
+        amount: calculateLogisticAmount(row),
         scope: row.scope,
       })),
       ...consumptions.map((row) => ({
@@ -193,7 +196,14 @@ class SummaryService {
     return {
       message: "Trip summary fetched",
       data: {
-        trip,
+        trip: {
+          id: trip.id,
+          title: trip.title,
+          location: trip.location,
+          startDate: trip.startDate,
+          endDate: trip.endDate,
+          publicReportEnabled: trip.publicReportEnabled,
+        },
         members_count: membersCount,
         expenses: {
           logistics: toMoney(logisticTotal),
@@ -208,6 +218,83 @@ class SummaryService {
         },
         saldo_trip: toMoney(saldoTrip),
         members: memberSummaries,
+      },
+    };
+  }
+
+  async getPublicReportByToken(token: string) {
+    const trip = await summaryRepository.getPublicTripByToken(token);
+    if (!trip) {
+      throw new NotFoundError("Report not found");
+    }
+
+    const [summaryResult, logistics, consumptions, accommodations] = await Promise.all([
+      this.getTripSummary(trip.id),
+      summaryRepository.getPublicLogisticsBreakdown(trip.id),
+      summaryRepository.getPublicConsumptionsBreakdown(trip.id),
+      summaryRepository.getPublicAccommodationsBreakdown(trip.id),
+    ]);
+
+    return {
+      message: "Public report retrieved successfully",
+      data: {
+        trip: {
+          title: trip.title,
+          location: trip.location,
+          start_date: trip.startDate,
+          end_date: trip.endDate,
+        },
+        members_count: summaryResult.data.members_count,
+        expenses: summaryResult.data.expenses,
+        funds: summaryResult.data.funds,
+        saldo_trip: summaryResult.data.saldo_trip,
+        members: summaryResult.data.members.map((member) => ({
+          name: member.name,
+          tagihan: member.tagihan,
+          bayar: member.bayar,
+          sisa: member.sisa,
+          status: member.status,
+        })),
+        breakdown: {
+          logistics: logistics.map((row) => ({
+            item: row.title,
+            unit: row.unit,
+            acquisition_type: row.acquisitionType,
+            scope: row.scope,
+            cost_type: row.costType,
+            price: row.price,
+            count: row.count,
+            duration: row.duration,
+            amount: toMoney(
+              calculateLogisticAmount({
+                acquisitionType: row.acquisitionType,
+                costType: row.costType,
+                price: row.price,
+                count: row.count,
+                duration: row.duration,
+              }),
+            ),
+          })),
+          consumptions: consumptions.map((row) => ({
+            item: row.title,
+            category: row.category,
+            unit: row.unit,
+            time: row.time,
+            scope: row.scope,
+            price: row.price,
+            count: row.count,
+            amount: toMoney(row.price * row.count),
+          })),
+          accommodations: accommodations.map((row) => ({
+            item: row.title,
+            category: row.category,
+            unit: row.unit,
+            scope: row.scope,
+            price: row.price,
+            count: row.count,
+            amount: toMoney(row.price * row.count),
+          })),
+        },
       },
     };
   }

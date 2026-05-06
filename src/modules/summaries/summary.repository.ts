@@ -2,9 +2,12 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { getDb } from "@/infrastructure/db";
 import {
+  accommodationItems,
   expenseParticipants,
   funds,
+  logisticItems,
   members,
+  consumptionItems,
   tripAccommodations,
   tripConsumptions,
   tripLogistics,
@@ -16,6 +19,21 @@ class SummaryRepository {
   async getTripById(tripId: string) {
     const db = getDb();
     const [trip] = await db.select().from(trips).where(eq(trips.id, tripId)).limit(1);
+    return trip ?? null;
+  }
+
+  async getPublicTripByToken(token: string) {
+    const db = getDb();
+    const [trip] = await db
+      .select()
+      .from(trips)
+      .where(
+        and(
+          eq(trips.publicReportToken, token),
+          eq(trips.publicReportEnabled, true),
+        ),
+      )
+      .limit(1);
     return trip ?? null;
   }
 
@@ -44,6 +62,60 @@ class SummaryRepository {
   async getTripAccommodations(tripId: string) {
     const db = getDb();
     return db.select().from(tripAccommodations).where(eq(tripAccommodations.tripId, tripId));
+  }
+
+  async getPublicLogisticsBreakdown(tripId: string) {
+    const db = getDb();
+    return db
+      .select({
+        title: logisticItems.title,
+        unit: logisticItems.unit,
+        acquisitionType: tripLogistics.acquisitionType,
+        scope: tripLogistics.scope,
+        costType: tripLogistics.costType,
+        price: tripLogistics.price,
+        count: tripLogistics.count,
+        duration: tripLogistics.duration,
+      })
+      .from(tripLogistics)
+      .innerJoin(logisticItems, eq(tripLogistics.logisticItemId, logisticItems.id))
+      .where(eq(tripLogistics.tripId, tripId));
+  }
+
+  async getPublicConsumptionsBreakdown(tripId: string) {
+    const db = getDb();
+    return db
+      .select({
+        title: consumptionItems.title,
+        category: consumptionItems.category,
+        unit: consumptionItems.unit,
+        time: tripConsumptions.time,
+        scope: tripConsumptions.scope,
+        price: tripConsumptions.price,
+        count: tripConsumptions.count,
+      })
+      .from(tripConsumptions)
+      .innerJoin(consumptionItems, eq(tripConsumptions.consumptionItemId, consumptionItems.id))
+      .where(eq(tripConsumptions.tripId, tripId));
+  }
+
+  async getPublicAccommodationsBreakdown(tripId: string) {
+    const db = getDb();
+    return db
+      .select({
+        title: accommodationItems.title,
+        category: accommodationItems.category,
+        unit: accommodationItems.unit,
+        scope: tripAccommodations.scope,
+        price: tripAccommodations.price,
+        count: tripAccommodations.count,
+      })
+      .from(tripAccommodations)
+      .innerJoin(
+        accommodationItems,
+        eq(tripAccommodations.accommodationItemId, accommodationItems.id),
+      )
+      .where(eq(tripAccommodations.tripId, tripId));
   }
 
   async getFunds(tripId: string) {

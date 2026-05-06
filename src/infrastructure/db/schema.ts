@@ -1,5 +1,6 @@
 import { InferInsertModel, InferSelectModel } from "drizzle-orm";
 import {
+  boolean,
   date,
   integer,
   numeric,
@@ -76,15 +77,25 @@ export const members = pgTable("members", {
   updatedAt: updatedAtColumn,
 });
 
-export const trips = pgTable("trips", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  title: varchar("title", { length: 255 }).notNull(),
-  location: varchar("location", { length: 255 }).notNull(),
-  startDate: date("start_date").notNull(),
-  endDate: date("end_date"),
-  createdAt: createdAtColumn,
-  updatedAt: updatedAtColumn,
-});
+export const trips = pgTable(
+  "trips",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: varchar("title", { length: 255 }).notNull(),
+    location: varchar("location", { length: 255 }).notNull(),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    publicReportEnabled: boolean("public_report_enabled").default(false).notNull(),
+    publicReportToken: text("public_report_token"),
+    createdAt: createdAtColumn,
+    updatedAt: updatedAtColumn,
+  },
+  (table) => ({
+    publicReportTokenUnique: uniqueIndex("trips_public_report_token_unique").on(
+      table.publicReportToken,
+    ),
+  }),
+);
 
 export const tripMembers = pgTable(
   "trip_members",

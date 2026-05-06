@@ -15,6 +15,16 @@ class TripRepository {
     return trip ?? null;
   }
 
+  async findByPublicReportToken(token: string) {
+    const db = getDb();
+    const [trip] = await db
+      .select()
+      .from(trips)
+      .where(eq(trips.publicReportToken, token))
+      .limit(1);
+    return trip ?? null;
+  }
+
   async create(payload: {
     title: string;
     location: string;
@@ -49,6 +59,27 @@ class TripRepository {
       .update(trips)
       .set({
         ...payload,
+        updatedAt: new Date(),
+      })
+      .where(eq(trips.id, id))
+      .returning();
+
+    return trip ?? null;
+  }
+
+  async updatePublicReport(
+    id: string,
+    payload: {
+      publicReportEnabled: boolean;
+      publicReportToken: string | null;
+    },
+  ) {
+    const db = getDb();
+    const [trip] = await db
+      .update(trips)
+      .set({
+        publicReportEnabled: payload.publicReportEnabled,
+        publicReportToken: payload.publicReportToken,
         updatedAt: new Date(),
       })
       .where(eq(trips.id, id))

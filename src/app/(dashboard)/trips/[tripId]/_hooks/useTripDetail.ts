@@ -12,6 +12,13 @@ export type TripData = {
   location: string;
   startDate: string;
   endDate: string | null;
+  publicReportEnabled: boolean;
+};
+
+export type PublicReportActionResponse = {
+  public_report_enabled: boolean;
+  public_report_token: string | null;
+  share_link: string | null;
 };
 
 export type Member = {
@@ -301,10 +308,11 @@ export function useTripDetail(tripId: string) {
     return map;
   }, [allMembers]);
 
-  const invokeAction = async (action: () => Promise<unknown>) => {
+  const invokeAction = async <T>(action: () => Promise<T>): Promise<T> => {
     try {
-      await action();
+      const result = await action();
       await fetchAll();
+      return result;
     } catch (caughtError) {
       if (caughtError instanceof ApiClientError) {
         throw caughtError;
@@ -515,5 +523,26 @@ export function useTripDetail(tripId: string) {
     updateFund: (id: string, payload: Partial<FundPayload>) =>
       invokeAction(() => apiClient.patch(`/api/trips/${tripId}/funds/${id}`, payload)),
     deleteFund: (id: string) => invokeAction(() => apiClient.del(`/api/trips/${tripId}/funds/${id}`)),
+    enablePublicReport: () =>
+      invokeAction(() =>
+        apiClient.post<PublicReportActionResponse, Record<string, never>>(
+          `/api/trips/${tripId}/public-report/enable`,
+          {},
+        ),
+      ),
+    regeneratePublicReport: () =>
+      invokeAction(() =>
+        apiClient.post<PublicReportActionResponse, Record<string, never>>(
+          `/api/trips/${tripId}/public-report/regenerate`,
+          {},
+        ),
+      ),
+    disablePublicReport: () =>
+      invokeAction(() =>
+        apiClient.post<PublicReportActionResponse, Record<string, never>>(
+          `/api/trips/${tripId}/public-report/disable`,
+          {},
+        ),
+      ),
   };
 }
